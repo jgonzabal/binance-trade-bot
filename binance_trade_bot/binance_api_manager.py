@@ -19,12 +19,10 @@ class AllTickers:  # pylint: disable=too-few-public-methods
     def get_price(self, ticker_symbol):
         ticker = next((t for t in self.all_tickers if t["symbol"] == ticker_symbol), None)
         return float(ticker["price"]) if ticker else None
-    
-class BinanceAPIOption:
-    def __init__(self) -> None:
-        pass
+
+
 class BinanceAPIManager:
-    def __init__(self, config: Config, db: Database, logger: Logger, **kwargs):
+    def __init__(self, config: Config, db: Database, logger: Logger):
         self.binance_client = Client(
             config.BINANCE_API_KEY,
             config.BINANCE_API_SECRET_KEY,
@@ -199,8 +197,8 @@ class BinanceAPIManager:
 
         return False
 
-    def buy_alt(self, origin_coin: Coin, target_coin: Coin, all_tickers: AllTickers, **kwargs):
-        return self.retry(self._buy_alt, origin_coin, target_coin, all_tickers, **kwargs)
+    def buy_alt(self, origin_coin: Coin, target_coin: Coin, all_tickers: AllTickers):
+        return self.retry(self._buy_alt, origin_coin, target_coin, all_tickers)
 
     def _buy_quantity(
         self, origin_symbol: str, target_symbol: str, target_balance: float = None, from_coin_price: float = None
@@ -211,11 +209,7 @@ class BinanceAPIManager:
         origin_tick = self.get_alt_tick(origin_symbol, target_symbol)
         return math.floor(target_balance * 10 ** origin_tick / from_coin_price) / float(10 ** origin_tick)
 
-    def _get_buy_stoploss_price(self, price, stoploss_percent=None):
-        stoploss = stoploss_percent or self.config.BUY_STOPLOSS or 0
-        return abs(price - (float(stoploss)/100 * price))
-
-    def _buy_alt(self, origin_coin: Coin, target_coin: Coin, all_tickers, **kwargs):
+    def _buy_alt(self, origin_coin: Coin, target_coin: Coin, all_tickers):
         """
         Buy altcoin
         """
@@ -228,10 +222,6 @@ class BinanceAPIManager:
         from_coin_price = all_tickers.get_price(origin_symbol + target_symbol)
 
         order_quantity = self._buy_quantity(origin_symbol, target_symbol, target_balance, from_coin_price)
-        
-        if order_quantity * from_coin_price < self.get_min_notional(origin_symbol, target_symbol):
-            return None
-
         self.logger.info(f"BUY QTY {order_quantity}")
 
         # Try to buy until successful
@@ -240,8 +230,6 @@ class BinanceAPIManager:
             try:
                 order = self.binance_client.order_limit_buy(
                     symbol=origin_symbol + target_symbol,
-                    stopPrice=self._get_buy_stoploss_price(from_coin_price),
-                    type=Client.ORDER_TYPE_STOP_LOSS_LIMIT,
                     quantity=order_quantity,
                     price=from_coin_price,
                 )
@@ -314,8 +302,7 @@ class BinanceAPIManager:
             new_balance = self.get_currency_balance(origin_symbol)
 
         self.logger.info(f"Sold {origin_symbol}")
-        self.db.set_current_coin(origin_coin)
-        
+
         trade_log.set_complete(stat["cummulativeQuoteQty"])
 
         return order
