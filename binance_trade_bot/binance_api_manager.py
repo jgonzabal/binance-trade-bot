@@ -70,7 +70,6 @@ class BinanceAPIManager:
         """
         return self.binance_client.get_account()
 
-    @cached(cache=TTLCache(maxsize=2000, ttl=60))
     def get_all_market_tickers(self) -> AllTickers:
         """
         Get ticker price of all coins
@@ -81,12 +80,11 @@ class BinanceAPIManager:
         """
         Get ticker price of a specific coin
         """
-        symbol_dict = self.binance_client.get_symbol_ticker(symbol=ticker_symbol)
-        if symbol_dict:
-            return float(symbol_dict["price"])
+        for ticker in self.binance_client.get_symbol_ticker():
+            if ticker["symbol"] == ticker_symbol:
+                return float(ticker["price"])
         return None
 
-    @cached(cache=TTLCache(maxsize=2000, ttl=60))
     def get_currency_balance(self, currency_symbol: str):
         """
         Get balance of a specific coin

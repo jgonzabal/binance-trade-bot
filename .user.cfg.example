@@ -10,4 +10,3 @@ scout_sleep_time=60
 strategy=default
 buy_timeout=0
 sell_timeout=0
-buy_stoploss=2
