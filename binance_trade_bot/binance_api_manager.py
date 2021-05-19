@@ -223,7 +223,7 @@ class BinanceAPIManager:
                 self.logger.info(f"Unexpected Error: {e}")
                 time.sleep(1)
 
-        self._set_stop_loss_order(origin_symbol, target_symbol, order_status)
+        # self._set_stop_loss_order(origin_symbol, target_symbol, order_status)
 
         self.logger.debug(f"Order filled: {order_status}")
         return order_status
@@ -277,6 +277,8 @@ class BinanceAPIManager:
         origin_symbol = origin_coin.symbol
         target_symbol = target_coin.symbol
 
+        self._cancel_previous_orders(origin_symbol, target_symbol)
+
         with self.cache.open_balances() as balances:
             balances.clear()
 
@@ -286,8 +288,6 @@ class BinanceAPIManager:
 
         order_quantity = self._buy_quantity(origin_symbol, target_symbol, target_balance, from_coin_price)
         self.logger.info(f"BUY QTY {order_quantity} of <{origin_symbol}>")
-
-        self._cancel_previous_orders(origin_symbol, target_symbol)
 
         # Try to buy until successful
         order = None
@@ -337,7 +337,9 @@ class BinanceAPIManager:
         for order in orders:
             cancel_order = None
             while cancel_order is None:
-                cancel_order = self.binance_client.cancel_order(symbol=origin_symbol + target_symbol, orderId=order)
+                cancel_order = self.binance_client.cancel_order(
+                    symbol=origin_symbol + target_symbol, orderId=order["orderId"]
+                )
             self.logger.info("Unneeded order, canceled...")
 
     def _sell_alt(self, origin_coin: Coin, target_coin: Coin):
