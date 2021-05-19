@@ -149,6 +149,28 @@ class BinanceAPIManager:
     def get_min_notional(self, origin_symbol: str, target_symbol: str):
         return float(self.get_symbol_filter(origin_symbol, target_symbol, "MIN_NOTIONAL")["minNotional"])
 
+    def _set_stop_loss_order(self, origin_symbol: str, target_symbol: str, order_status: BinanceOrder):
+        """
+        Set a stop less order
+        """
+
+        order = None
+        while order is None:
+            try:
+                order_quantity = self._sell_quantity(origin_symbol, target_symbol)
+                order = self.binance_client.order_limit_sell(
+                    symbol=origin_symbol + target_symbol,
+                    quantity=order_quantity,
+                    price=order_status.price * (1 - self.config.MAXIMUM_LOSS / 100),
+                    stopPrice=order_status.price * (1 - self.config.MAXIMUM_LOSS / 100),
+                )
+                self.logger.info(order)
+            except BinanceAPIException as e:
+                self.logger.info(e)
+                time.sleep(1)
+            except Exception as e:  # pylint: disable=broad-except
+                self.logger.warning(f"Unexpected Error: {e}")
+
     def _wait_for_order(
         self, order_id, origin_symbol: str, target_symbol: str
     ) -> Optional[BinanceOrder]:  # pylint: disable=unsubscriptable-object
@@ -200,6 +222,8 @@ class BinanceAPIManager:
             except Exception as e:  # pylint: disable=broad-except
                 self.logger.info(f"Unexpected Error: {e}")
                 time.sleep(1)
+
+        self._set_stop_loss_order(origin_symbol, target_symbol, order_status)
 
         self.logger.debug(f"Order filled: {order_status}")
         return order_status
@@ -263,6 +287,8 @@ class BinanceAPIManager:
         order_quantity = self._buy_quantity(origin_symbol, target_symbol, target_balance, from_coin_price)
         self.logger.info(f"BUY QTY {order_quantity} of <{origin_symbol}>")
 
+        self._cancel_previous_orders(origin_symbol, target_symbol)
+
         # Try to buy until successful
         order = None
         order_guard = self.stream_manager.acquire_order_guard()
@@ -302,6 +328,17 @@ class BinanceAPIManager:
 
         origin_tick = self.get_alt_tick(origin_symbol, target_symbol)
         return math.floor(origin_balance * 10 ** origin_tick) / float(10 ** origin_tick)
+
+    def _cancel_previous_orders(self, origin_symbol: str, target_symbol: str):
+        """
+        Check if there are previous orders and cancel
+        """
+        orders = self.binance_client.get_open_orders(symbol=origin_symbol + target_symbol)
+        for order in orders:
+            cancel_order = None
+            while cancel_order is None:
+                cancel_order = self.binance_client.cancel_order(symbol=origin_symbol + target_symbol, orderId=order)
+            self.logger.info("Unneeded order, canceled...")
 
     def _sell_alt(self, origin_coin: Coin, target_coin: Coin):
         """
