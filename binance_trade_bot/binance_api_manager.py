@@ -277,8 +277,6 @@ class BinanceAPIManager:
         origin_symbol = origin_coin.symbol
         target_symbol = target_coin.symbol
 
-        self._cancel_previous_orders(origin_symbol, target_symbol)
-
         with self.cache.open_balances() as balances:
             balances.clear()
 
@@ -329,7 +327,7 @@ class BinanceAPIManager:
         origin_tick = self.get_alt_tick(origin_symbol, target_symbol)
         return math.floor(origin_balance * 10 ** origin_tick) / float(10 ** origin_tick)
 
-    def _cancel_previous_orders(self, origin_symbol: str, target_symbol: str):
+    def cancel_previous_orders(self, origin_symbol: str, target_symbol: str):
         """
         Check if there are previous orders and cancel
         """

@@ -24,6 +24,8 @@ class AutoTrader:
         """
         Jump from the source coin to the destination coin through bridge coin
         """
+        self.manager.cancel_previous_orders(pair.from_coin, self.config.BRIDGE_SYMBOL)
+
         can_sell = False
         balance = self.manager.get_currency_balance(pair.from_coin.symbol)
         from_coin_price = self.manager.get_ticker_price(pair.from_coin + self.config.BRIDGE)
