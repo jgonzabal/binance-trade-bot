@@ -1,3 +1,4 @@
+import decimal
 import math
 import time
 import traceback
@@ -12,6 +13,30 @@ from .config import Config
 from .database import Database
 from .logger import Logger
 from .models import Coin
+
+
+def price_decimals(f):
+    """
+    Convert the given float to a string,
+    without resorting to scientific notation
+    and returns number of decimals
+    """
+
+    # create a new context for this task
+    ctx = decimal.Context()
+
+    # 20 digits should be enough for everyone :D
+    ctx.prec = 20
+
+    d1 = ctx.create_decimal(repr(f))
+    floatstring = format(d1, "f")
+
+    decimals = 0
+
+    if "." in floatstring:
+        decimals = len(floatstring.split(".")[1])
+
+    return decimals
 
 
 class BinanceAPIManager:
@@ -153,19 +178,24 @@ class BinanceAPIManager:
         """
         Set a stop less order
         """
-
+        precision = price_decimals(price)
         order = None
         while order is None:
             try:
                 order_quantity = (
                     self._sell_quantity(origin_symbol, target_symbol) if order_quantity <= 0.0 else order_quantity
                 )
-                order = self.binance_client.order_limit_sell(
+
+                order = self.binance_client.create_order(
                     symbol=origin_symbol + target_symbol,
                     quantity=order_quantity,
-                    price=price * (1 - self.config.MAXIMUM_LOSS / 100),
-                    stopPrice=price * (1 - self.config.MAXIMUM_LOSS / 100),
+                    type=self.binance_client.ORDER_TYPE_STOP_LOSS_LIMIT,
+                    price=round(price * (1 - self.config.MAXIMUM_LOSS / 100), precision),
+                    stopPrice=round(price * (1 - self.config.MAXIMUM_LOSS / 100), precision),
+                    side=self.binance_client.SIDE_SELL,
+                    timeInForce="GTC",
                 )
+
                 self.logger.info(order)
             except BinanceAPIException as e:
                 self.logger.info(e)
