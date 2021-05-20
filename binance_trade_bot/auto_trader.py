@@ -196,17 +196,11 @@ class AutoTrader:
                         and float(order["stopPrice"]) > 0.0
                         and float(order["stopPrice"]) < usd_value * (1 - self.config.MAXIMUM_LOSS / 100)
                     ):
-                        self.logger.info(f"Will cancel order  {order} ")
-                        # self.manager.cancel_previous_orders(coin.symbol, self.config.BRIDGE_SYMBOL)
+                        self.manager.cancel_previous_orders(coin.symbol, self.config.BRIDGE_SYMBOL)
                         self.logger.info(
                             f"Will be setting a stop loss order with value "
                             + str(usd_value * (1 - self.config.MAXIMUM_LOSS / 100))
                         )
-                        # self.manager.set_stop_loss_order(
-                        #       self,
-                        #       coin.symbol,
-                        #       self.config.BRIDGE_SYMBOL,
-                        #       usd_value,
-                        #       order['origQty']
-                        # )
-                        #
+                        self.manager.set_stop_loss_order(
+                            self, coin.symbol, self.config.BRIDGE_SYMBOL, usd_value, order["origQty"]
+                        )
