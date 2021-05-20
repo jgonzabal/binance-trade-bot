@@ -149,7 +149,7 @@ class BinanceAPIManager:
     def get_min_notional(self, origin_symbol: str, target_symbol: str):
         return float(self.get_symbol_filter(origin_symbol, target_symbol, "MIN_NOTIONAL")["minNotional"])
 
-    def _set_stop_loss_order(self, origin_symbol: str, target_symbol: str, order_status: BinanceOrder):
+    def set_stop_loss_order(self, origin_symbol: str, target_symbol: str, price: float, order_quantity: float = 0.0):
         """
         Set a stop less order
         """
@@ -157,12 +157,14 @@ class BinanceAPIManager:
         order = None
         while order is None:
             try:
-                order_quantity = self._sell_quantity(origin_symbol, target_symbol)
+                order_quantity = (
+                    self._sell_quantity(origin_symbol, target_symbol) if order_quantity <= 0.0 else order_quantity
+                )
                 order = self.binance_client.order_limit_sell(
                     symbol=origin_symbol + target_symbol,
                     quantity=order_quantity,
-                    price=order_status.price * (1 - self.config.MAXIMUM_LOSS / 100),
-                    stopPrice=order_status.price * (1 - self.config.MAXIMUM_LOSS / 100),
+                    price=price * (1 - self.config.MAXIMUM_LOSS / 100),
+                    stopPrice=price * (1 - self.config.MAXIMUM_LOSS / 100),
                 )
                 self.logger.info(order)
             except BinanceAPIException as e:
@@ -223,7 +225,7 @@ class BinanceAPIManager:
                 self.logger.info(f"Unexpected Error: {e}")
                 time.sleep(1)
 
-        # self._set_stop_loss_order(origin_symbol, target_symbol, order_status)
+        # self.set_stop_loss_order(origin_symbol, target_symbol, order_status.price)
 
         self.logger.debug(f"Order filled: {order_status}")
         return order_status

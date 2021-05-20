@@ -188,3 +188,25 @@ class AutoTrader:
                 cv = CoinValue(coin, balance, usd_value, btc_value, datetime=now)
                 session.add(cv)
                 self.db.send_update(cv)
+
+                orders = self.manager.binance_client.get_open_orders(symbol=coin.symbol + self.config.BRIDGE_SYMBOL)
+                for order in orders:
+                    if (
+                        "stopPrice" in order
+                        and float(order["stopPrice"]) > 0.0
+                        and float(order["stopPrice"]) < usd_value * (1 - self.config.MAXIMUM_LOSS / 100)
+                    ):
+                        self.logger.info(f"Will cancel order  {order} ")
+                        # self.manager.cancel_previous_orders(coin.symbol, self.config.BRIDGE_SYMBOL)
+                        self.logger.info(
+                            f"Will be setting a stop loss order with value "
+                            + str(usd_value * (1 - self.config.MAXIMUM_LOSS / 100))
+                        )
+                        # self.manager.set_stop_loss_order(
+                        #       self,
+                        #       coin.symbol,
+                        #       self.config.BRIDGE_SYMBOL,
+                        #       usd_value,
+                        #       order['origQty']
+                        # )
+                        #
