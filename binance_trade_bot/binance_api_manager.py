@@ -198,7 +198,6 @@ class BinanceAPIManager:
                     timeInForce="GTC",
                 )
 
-                self.logger.info(order)
             except BinanceAPIException as e:
                 self.logger.info(e)
                 time.sleep(1)
