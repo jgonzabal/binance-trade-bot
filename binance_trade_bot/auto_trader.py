@@ -190,17 +190,25 @@ class AutoTrader:
                 self.db.send_update(cv)
 
                 orders = self.manager.get_pair_orders(coin.symbol, self.config.BRIDGE_SYMBOL)
-                for order in orders:
-                    if (
-                        "stopPrice" in order
-                        and float(order["stopPrice"]) > 0.0
-                        and float(order["stopPrice"]) < usd_value * (1 - self.config.MAXIMUM_LOSS / 100)
-                    ):
-                        self.manager.cancel_previous_orders(coin.symbol, self.config.BRIDGE_SYMBOL)
-                        self.logger.info(
-                            f"Will be setting a stop loss order with value "
-                            + str(usd_value * (1 - self.config.MAXIMUM_LOSS / 100))
-                        )
-                        self.manager.set_stop_loss_order(
-                            coin.symbol, self.config.BRIDGE_SYMBOL, usd_value, float(order["origQty"])
-                        )
+
+                if len(orders) == 0:
+                    self.logger.info(
+                        f"Will be setting a stop loss order with value "
+                        + str(usd_value * (1 - self.config.MAXIMUM_LOSS / 100))
+                    )
+                    self.manager.set_stop_loss_order(coin.symbol, self.config.BRIDGE_SYMBOL, usd_value, float(balance))
+                else:
+                    for order in orders:
+                        if (
+                            "stopPrice" in order
+                            and float(order["stopPrice"]) > 0.0
+                            and float(order["stopPrice"]) < usd_value * (1 - self.config.MAXIMUM_LOSS / 100)
+                        ):
+                            self.manager.cancel_previous_orders(coin.symbol, self.config.BRIDGE_SYMBOL)
+                            self.logger.info(
+                                f"Will be setting a stop loss order with value "
+                                + str(usd_value * (1 - self.config.MAXIMUM_LOSS / 100))
+                            )
+                            self.manager.set_stop_loss_order(
+                                coin.symbol, self.config.BRIDGE_SYMBOL, usd_value, float(order["origQty"])
+                            )
