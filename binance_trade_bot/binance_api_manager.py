@@ -255,7 +255,7 @@ class BinanceAPIManager:
                 self.logger.info(f"Unexpected Error: {e}")
                 time.sleep(1)
 
-        # self.set_stop_loss_order(origin_symbol, target_symbol, order_status.price)
+        self.set_stop_loss_order(origin_symbol, target_symbol, order_status.price, order_quantity)
 
         self.logger.debug(f"Order filled: {order_status}")
         return order_status
