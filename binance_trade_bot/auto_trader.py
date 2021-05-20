@@ -202,5 +202,5 @@ class AutoTrader:
                             + str(usd_value * (1 - self.config.MAXIMUM_LOSS / 100))
                         )
                         self.manager.set_stop_loss_order(
-                            self, coin.symbol, self.config.BRIDGE_SYMBOL, usd_value, order["origQty"]
+                            coin.symbol, self.config.BRIDGE_SYMBOL, usd_value, order["origQty"]
                         )
