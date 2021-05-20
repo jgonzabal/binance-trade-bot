@@ -189,7 +189,7 @@ class AutoTrader:
                 session.add(cv)
                 self.db.send_update(cv)
 
-                orders = self.manager.binance_client.get_open_orders(symbol=coin.symbol + self.config.BRIDGE_SYMBOL)
+                orders = self.manager.get_pair_orders(coin.symbol, self.config.BRIDGE_SYMBOL)
                 for order in orders:
                     if (
                         "stopPrice" in order

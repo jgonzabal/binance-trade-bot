@@ -329,11 +329,28 @@ class BinanceAPIManager:
         origin_tick = self.get_alt_tick(origin_symbol, target_symbol)
         return math.floor(origin_balance * 10 ** origin_tick) / float(10 ** origin_tick)
 
+    def get_pair_orders(self, origin_symbol: str, target_symbol: str):
+        """
+        Query open orders for a given pair
+        """
+
+        orders = []
+        try:
+            orders = self.binance_client.get_open_orders(symbol=origin_symbol + target_symbol)
+        except BinanceAPIException as e:
+            self.logger.info(f"Unexpected Error Getting orders from {origin_symbol} to {target_symbol}")
+            self.logger.info(e)
+            time.sleep(1)
+        except Exception as e:  # pylint: disable=broad-except
+            self.logger.warning(f"Unexpected Error: {e}")
+
+        return orders
+
     def cancel_previous_orders(self, origin_symbol: str, target_symbol: str):
         """
         Check if there are previous orders and cancel
         """
-        orders = self.binance_client.get_open_orders(symbol=origin_symbol + target_symbol)
+        orders = self.get_pair_orders(origin_symbol, target_symbol)
         for order in orders:
             cancel_order = None
             while cancel_order is None:
