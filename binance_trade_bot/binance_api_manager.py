@@ -183,7 +183,9 @@ class BinanceAPIManager:
         while order is None:
             try:
                 order_quantity = (
-                    self._sell_quantity(origin_symbol, target_symbol) if order_quantity <= 0.0 else order_quantity
+                    self._sell_quantity(origin_symbol, target_symbol)
+                    if float(order_quantity) <= 0.0
+                    else order_quantity
                 )
 
                 order = self.binance_client.create_order(
@@ -204,7 +206,7 @@ class BinanceAPIManager:
                 self.logger.warning(f"Unexpected Error: {e}")
 
     def _wait_for_order(
-        self, order_id, origin_symbol: str, target_symbol: str
+        self, order_id, origin_symbol: str, target_symbol: str, order_quantity: str
     ) -> Optional[BinanceOrder]:  # pylint: disable=unsubscriptable-object
         while True:
             order_status: BinanceOrder = self.cache.orders.get(order_id, None)
@@ -255,16 +257,16 @@ class BinanceAPIManager:
                 self.logger.info(f"Unexpected Error: {e}")
                 time.sleep(1)
 
-        self.set_stop_loss_order(origin_symbol, target_symbol, order_status.price, order_quantity)
+        self.set_stop_loss_order(origin_symbol, target_symbol, order_status.price, float(order_quantity))
 
         self.logger.debug(f"Order filled: {order_status}")
         return order_status
 
     def wait_for_order(
-        self, order_id, origin_symbol: str, target_symbol: str, order_guard: OrderGuard
+        self, order_id, origin_symbol: str, target_symbol: str, order_guard: OrderGuard, order_quantity: str
     ) -> Optional[BinanceOrder]:  # pylint: disable=unsubscriptable-object
         with order_guard:
-            return self._wait_for_order(order_id, origin_symbol, target_symbol)
+            return self._wait_for_order(order_id, origin_symbol, target_symbol, order_quantity)
 
     def _should_cancel_order(self, order_status):
         minutes = (time.time() - order_status.time / 1000) / 60
@@ -339,7 +341,7 @@ class BinanceAPIManager:
         trade_log.set_ordered(origin_balance, target_balance, order_quantity)
 
         order_guard.set_order(origin_symbol, target_symbol, int(order["orderId"]))
-        order = self.wait_for_order(order["orderId"], origin_symbol, target_symbol, order_guard)
+        order = self.wait_for_order(order["orderId"], origin_symbol, target_symbol, order_guard, order_quantity)
 
         if order is None:
             return None
@@ -424,7 +426,7 @@ class BinanceAPIManager:
         trade_log.set_ordered(origin_balance, target_balance, order_quantity)
 
         order_guard.set_order(origin_symbol, target_symbol, int(order["orderId"]))
-        order = self.wait_for_order(order["orderId"], origin_symbol, target_symbol, order_guard)
+        order = self.wait_for_order(order["orderId"], origin_symbol, target_symbol, order_guard, order_quantity)
 
         if order is None:
             return None
