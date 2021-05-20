@@ -390,7 +390,6 @@ class BinanceAPIManager:
                 cancel_order = self.binance_client.cancel_order(
                     symbol=origin_symbol + target_symbol, orderId=order["orderId"]
                 )
-            self.logger.info("Unneeded order, canceled...")
 
     def _sell_alt(self, origin_coin: Coin, target_coin: Coin):
         """
