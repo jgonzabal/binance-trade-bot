@@ -335,8 +335,10 @@ class BinanceAPIManager:
         """
 
         orders = []
+
         try:
-            orders = self.binance_client.get_open_orders(symbol=origin_symbol + target_symbol)
+            if origin_symbol != target_symbol:
+                orders = self.binance_client.get_open_orders(symbol=origin_symbol + target_symbol)
         except BinanceAPIException as e:
             self.logger.info(f"Unexpected Error Getting orders from {origin_symbol} to {target_symbol}")
             self.logger.info(e)
