@@ -11,5 +11,5 @@ strategy=default
 buy_timeout=0
 sell_timeout=0
 buy_order_type=limit
-sell_order_type=market
+sell_order_type=limit
 maximum_loss=5

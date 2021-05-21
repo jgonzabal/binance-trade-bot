@@ -174,9 +174,11 @@ class BinanceAPIManager:
     def get_min_notional(self, origin_symbol: str, target_symbol: str):
         return float(self.get_symbol_filter(origin_symbol, target_symbol, "MIN_NOTIONAL")["minNotional"])
 
-    def set_stop_loss_order(self, origin_symbol: str, target_symbol: str, price: float, order_quantity: float = 0.0):
+    def set_sell_stop_loss_order(
+        self, origin_symbol: str, target_symbol: str, price: float, order_quantity: float = 0.0
+    ):
         """
-        Set a stop less order
+        Set a sell stop less order
         """
         precision = price_decimals(price)
         order = None
@@ -195,6 +197,35 @@ class BinanceAPIManager:
                     price=round(price * (1 - self.config.MAXIMUM_LOSS / 100), precision),
                     stopPrice=round(price * (1 - self.config.MAXIMUM_LOSS / 100), precision),
                     side=self.binance_client.SIDE_SELL,
+                    timeInForce="GTC",
+                )
+
+            except BinanceAPIException as e:
+                self.logger.info(e)
+                time.sleep(1)
+            except Exception as e:  # pylint: disable=broad-except
+                self.logger.warning(f"Unexpected Error: {e}")
+
+    def set_buy_stop_loss_order(
+        self, origin_symbol: str, target_symbol: str, price: float, order_quantity: float = None
+    ):
+        """
+        Set a buy stop less order
+        """
+        precision = price_decimals(price)
+        price = round(price * (1 + self.config.MAXIMUM_LOSS / 100), precision)
+
+        order_quantity = order_quantity or self._buy_quantity(origin_symbol, target_symbol, price)
+        order = None
+        while order is None:
+            try:
+                order = self.binance_client.create_order(
+                    symbol=origin_symbol + target_symbol,
+                    quantity=order_quantity,
+                    type=self.binance_client.ORDER_TYPE_STOP_LOSS_LIMIT,
+                    price=price,
+                    stopPrice=price,
+                    side=self.binance_client.SIDE_BUY,
                     timeInForce="GTC",
                 )
 
@@ -256,7 +287,7 @@ class BinanceAPIManager:
                 self.logger.info(f"Unexpected Error: {e}")
                 time.sleep(1)
 
-        # self.set_stop_loss_order(origin_symbol, target_symbol, order_status.price, float(order_quantity))
+        # self.set_sell_stop_loss_order(origin_symbol, target_symbol, order_status.price, float(order_quantity))
 
         self.logger.debug(f"Order filled: {order_status}")
         return order_status

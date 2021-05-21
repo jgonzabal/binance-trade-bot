@@ -189,18 +189,45 @@ class AutoTrader:
                 session.add(cv)
                 self.db.send_update(cv)
 
-                orders = self.manager.get_pair_orders(coin.symbol, self.config.BRIDGE_SYMBOL)
-                for order in orders:
-                    if (
-                        "stopPrice" in order
-                        and float(order["stopPrice"]) > 0.0
-                        and float(order["stopPrice"]) < usd_value * (1 - self.config.MAXIMUM_LOSS / 100)
-                    ):
-                        self.manager.cancel_previous_orders(coin.symbol, self.config.BRIDGE_SYMBOL)
-                        self.logger.info(
-                            f"Will be setting a stop loss order with value "
-                            + str(usd_value * (1 - self.config.MAXIMUM_LOSS / 100))
-                        )
-                        self.manager.set_stop_loss_order(
-                            coin.symbol, self.config.BRIDGE_SYMBOL, usd_value, float(order["origQty"])
-                        )
+                current_coin = self.db.get_current_coin()
+
+                if current_coin == coin and coin.symbol != self.config.BRIDGE_SYMBOL:
+                    orders = self.manager.get_pair_orders(coin.symbol, self.config.BRIDGE_SYMBOL)
+
+                    if len(orders) > 0:
+                        for order in orders:
+                            if (
+                                "stopPrice" in order
+                                and order["side"] == self.manager.binance_client.SIDE_SELL
+                                and float(order["stopPrice"]) > 0.0
+                                and float(order["stopPrice"]) < usd_value * (1 - self.config.MAXIMUM_LOSS / 100)
+                            ):
+                                self.manager.cancel_previous_orders(coin.symbol, self.config.BRIDGE_SYMBOL)
+                                self.logger.info(
+                                    f"Will be setting a stop loss order with value "
+                                    + str(usd_value * (1 - self.config.MAXIMUM_LOSS / 100))
+                                )
+                                self.manager.set_sell_stop_loss_order(
+                                    coin.symbol, self.config.BRIDGE_SYMBOL, usd_value, float(order["origQty"])
+                                )
+                            elif (
+                                "stopPrice" in order
+                                and order["side"] == self.manager.binance_client.SIDE_BUY
+                                and float(order["stopPrice"]) > 0.0
+                                and float(order["stopPrice"]) > usd_value * (1 + self.config.MAXIMUM_LOSS / 100)
+                            ):
+                                self.manager.cancel_previous_orders(coin.symbol, self.config.BRIDGE_SYMBOL)
+                                self.logger.info(
+                                    f"Will be setting a stop loss order to buy at "
+                                    + str(usd_value * (1 + self.config.MAXIMUM_LOSS / 100))
+                                )
+                                self.manager.set_buy_stop_loss_order(self.config.BRIDGE_SYMBOL, coin.symbol, usd_value)
+                    # else:
+                    #     self.manager.cancel_previous_orders(coin.symbol, self.config.BRIDGE_SYMBOL)
+                    #     self.logger.info(
+                    #         f"Will be setting a stop loss order to buy at "
+                    #         + str(usd_value * (1 + self.config.MAXIMUM_LOSS / 100))
+                    #     )
+                    #     self.manager.set_buy_stop_loss_order(
+                    #         self.config.BRIDGE_SYMBOL, coin.symbol, usd_value
+                    #     )
