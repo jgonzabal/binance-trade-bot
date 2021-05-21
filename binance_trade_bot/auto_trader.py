@@ -198,7 +198,7 @@ class AutoTrader:
                     if orders is None:
                         continue
 
-                    if isinstance(orders, list) is list and len(orders) > 0:
+                    if isinstance(orders, list) and len(orders) > 0:
                         for order in orders:
                             if (
                                 "stopPrice" in order
