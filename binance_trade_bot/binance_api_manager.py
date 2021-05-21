@@ -428,6 +428,14 @@ class BinanceAPIManager:
                         symbol=origin_symbol + target_symbol, orderId=order["orderId"]
                     )
 
+    def cancel_order(self, symbol: str, orderId: str):
+        """
+        Check if there are previous orders and cancel
+        """
+        cancel_order = None
+        while cancel_order is None:
+            cancel_order = self.binance_client.cancel_order(symbol=symbol, orderId=orderId)
+
     def _sell_alt(self, origin_coin: Coin, target_coin: Coin):
         """
         Sell altcoin
