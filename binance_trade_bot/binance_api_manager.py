@@ -401,7 +401,7 @@ class BinanceAPIManager:
         Query open orders for a given pair
         """
 
-        orders = []
+        orders = None
 
         try:
             if origin_symbol != target_symbol:
