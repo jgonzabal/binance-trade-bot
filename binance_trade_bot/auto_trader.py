@@ -221,7 +221,7 @@ class AutoTrader:
                                     f"Will be setting a stop loss order to buy at "
                                     + str(usd_value * (1 + self.config.MAXIMUM_LOSS / 100))
                                 )
-                                self.manager.set_buy_stop_loss_order(coin.symbol, self.config.BRIDGE_SYMBOL)
+                                self.manager.set_buy_stop_loss_order(coin.symbol, self.config.BRIDGE_SYMBOL, usd_value)
                     # else:
                     #     self.manager.cancel_previous_orders(coin.symbol, self.config.BRIDGE_SYMBOL)
                     #     self.logger.info(
