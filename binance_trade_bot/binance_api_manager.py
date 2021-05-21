@@ -420,7 +420,7 @@ class BinanceAPIManager:
         Check if there are previous orders and cancel
         """
         orders = self.get_pair_orders(origin_symbol, target_symbol)
-        if orders:
+        if orders is not None:
             for order in orders:
                 cancel_order = None
                 while cancel_order is None:
