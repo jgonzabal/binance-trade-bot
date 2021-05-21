@@ -420,12 +420,13 @@ class BinanceAPIManager:
         Check if there are previous orders and cancel
         """
         orders = self.get_pair_orders(origin_symbol, target_symbol)
-        for order in orders:
-            cancel_order = None
-            while cancel_order is None:
-                cancel_order = self.binance_client.cancel_order(
-                    symbol=origin_symbol + target_symbol, orderId=order["orderId"]
-                )
+        if orders:
+            for order in orders:
+                cancel_order = None
+                while cancel_order is None:
+                    cancel_order = self.binance_client.cancel_order(
+                        symbol=origin_symbol + target_symbol, orderId=order["orderId"]
+                    )
 
     def _sell_alt(self, origin_coin: Coin, target_coin: Coin):
         """
