@@ -241,7 +241,8 @@ class AutoTrader:
 
                         if coin_balance * usd_value > 1:
                             self.logger.info(
-                                f"Set a sell order with value " + str(usd_value * (1 - self.config.MAXIMUM_LOSS / 100))
+                                f"Set stop loss order to sell at "
+                                + str(usd_value * (1 - self.config.MAXIMUM_LOSS / 100))
                             )
                             self.manager.set_sell_stop_loss_order(coin.symbol, self.config.BRIDGE_SYMBOL, usd_value)
 
