@@ -194,6 +194,7 @@ class AutoTrader:
                 if current_coin.symbol == coin.symbol and coin.symbol != self.config.BRIDGE_SYMBOL:
                     orders = self.manager.get_pair_orders(coin.symbol, self.config.BRIDGE_SYMBOL)
 
+                    self.logger.debug(f"Resolving orders {orders} ")
                     if orders is None:
                         continue
 
