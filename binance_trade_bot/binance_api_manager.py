@@ -206,34 +206,49 @@ class BinanceAPIManager:
             except Exception as e:  # pylint: disable=broad-except
                 self.logger.warning(f"Unexpected Error: {e}")
 
-    def set_buy_stop_loss_order(
-        self, origin_symbol: str, target_symbol: str, price: float, order_quantity: float = None
-    ):
+    def set_buy_stop_loss_order(self, origin_symbol: str, target_symbol: str):
         """
         Set a buy stop less order
         """
-        precision = price_decimals(price)
-        price = round(price * (1 + self.config.MAXIMUM_LOSS / 100), precision)
 
-        order_quantity = order_quantity or self._buy_quantity(origin_symbol, target_symbol, price)
-        order = None
-        while order is None:
-            try:
-                order = self.binance_client.create_order(
-                    symbol=origin_symbol + target_symbol,
-                    quantity=order_quantity,
-                    type=self.binance_client.ORDER_TYPE_STOP_LOSS_LIMIT,
-                    price=price,
-                    stopPrice=price,
-                    side=self.binance_client.SIDE_BUY,
-                    timeInForce="GTC",
-                )
+        with self.cache.open_balances() as balances:
+            balances.clear()
 
-            except BinanceAPIException as e:
-                self.logger.info(e)
-                time.sleep(1)
-            except Exception as e:  # pylint: disable=broad-except
-                self.logger.warning(f"Unexpected Error: {e}")
+        target_balance = self.get_currency_balance(target_symbol)
+        from_coin_price = self.get_ticker_price(origin_symbol + target_symbol)
+
+        precision = price_decimals(from_coin_price)
+        price = round(from_coin_price * (1 + self.config.MAXIMUM_LOSS / 100), precision)
+        order_quantity = self._buy_quantity(origin_symbol, target_symbol, target_balance, price)
+        futureorder = {
+            "symbol": origin_symbol + target_symbol,
+            "quantity": order_quantity,
+            "type": self.binance_client.ORDER_TYPE_STOP_LOSS_LIMIT,
+            "price": price,
+            "stopPrice": price,
+            "side": self.binance_client.SIDE_BUY,
+            "timeInForce": "GTC",
+        }
+        self.logger.debug(f"Will create buy order: {futureorder}")
+
+        # order = None
+        # while order is None:
+        #     try:
+        #         order = self.binance_client.create_order(
+        #             symbol=origin_symbol + target_symbol,
+        #             quantity=order_quantity,
+        #             type=self.binance_client.ORDER_TYPE_STOP_LOSS_LIMIT,
+        #             price=price,
+        #             stopPrice=price,
+        #             side=self.binance_client.SIDE_BUY,
+        #             timeInForce="GTC",
+        #         )
+
+        #     except BinanceAPIException as e:
+        #         self.logger.info(e)
+        #         time.sleep(1)
+        #     except Exception as e:  # pylint: disable=broad-except
+        #         self.logger.warning(f"Unexpected Error: {e}")
 
     def _wait_for_order(
         self, order_id, origin_symbol: str, target_symbol: str, order_quantity: str
