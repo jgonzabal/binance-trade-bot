@@ -197,7 +197,7 @@ class AutoTrader:
                     if orders is None:
                         continue
 
-                    if len(orders) > 0:
+                    if isinstance(orders, list) is list and len(orders) > 0:
                         for order in orders:
                             if (
                                 "stopPrice" in order
@@ -205,11 +205,12 @@ class AutoTrader:
                                 and float(order["stopPrice"]) > 0.0
                                 and float(order["stopPrice"]) < usd_value * (1 - self.config.MAXIMUM_LOSS / 100)
                             ):
-                                self.manager.cancel_order(order["symbol"], order["orderId"])
                                 self.logger.info(
                                     f"Will be setting a stop loss order with value "
                                     + str(usd_value * (1 - self.config.MAXIMUM_LOSS / 100))
+                                    + f" deleting order {order}"
                                 )
+                                self.manager.cancel_order(order["symbol"], order["orderId"])
                                 self.manager.set_sell_stop_loss_order(
                                     coin.symbol, self.config.BRIDGE_SYMBOL, usd_value, float(order["origQty"])
                                 )
@@ -219,11 +220,12 @@ class AutoTrader:
                                 and float(order["stopPrice"]) > 0.0
                                 and float(order["stopPrice"]) > usd_value * (1 + self.config.MAXIMUM_LOSS / 100)
                             ):
-                                self.manager.cancel_order(order["symbol"], order["orderId"])
                                 self.logger.info(
                                     f"Will be setting a stop loss order to buy at "
                                     + str(usd_value * (1 + self.config.MAXIMUM_LOSS / 100))
+                                    + f" deleting order {order}"
                                 )
+                                self.manager.cancel_order(order["symbol"], order["orderId"])
                                 self.manager.set_buy_stop_loss_order(coin.symbol, self.config.BRIDGE_SYMBOL, usd_value)
                     else:
                         coin_balance = 0
