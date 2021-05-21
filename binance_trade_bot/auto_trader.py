@@ -222,12 +222,19 @@ class AutoTrader:
                                     + str(usd_value * (1 + self.config.MAXIMUM_LOSS / 100))
                                 )
                                 self.manager.set_buy_stop_loss_order(coin.symbol, self.config.BRIDGE_SYMBOL, usd_value)
-                    # else:
-                    #     self.manager.cancel_previous_orders(coin.symbol, self.config.BRIDGE_SYMBOL)
-                    #     self.logger.info(
-                    #         f"Will be setting a stop loss order to buy at "
-                    #         + str(usd_value * (1 + self.config.MAXIMUM_LOSS / 100))
-                    #     )
-                    #     self.manager.set_buy_stop_loss_order(
-                    #         self.config.BRIDGE_SYMBOL, coin.symbol, usd_value
-                    #     )
+                    else:
+                        self.manager.cancel_previous_orders(coin.symbol, self.config.BRIDGE_SYMBOL)
+
+                        self.logger.info(
+                            f"Will first try to set a sell order with value "
+                            + str(usd_value * (1 - self.config.MAXIMUM_LOSS / 100))
+                        )
+                        self.manager.set_sell_stop_loss_order(
+                            coin.symbol, self.config.BRIDGE_SYMBOL, usd_value, float(order["origQty"])
+                        )
+
+                        self.logger.info(
+                            f"Will secondly try to set stop loss order to buy at "
+                            + str(usd_value * (1 + self.config.MAXIMUM_LOSS / 100))
+                        )
+                        self.manager.set_buy_stop_loss_order(self.config.BRIDGE_SYMBOL, coin.symbol, usd_value)
