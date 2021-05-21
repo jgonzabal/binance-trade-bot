@@ -236,15 +236,13 @@ class AutoTrader:
                         except Exception as e:  # pylint: disable=broad-except
                             self.logger.warning(f"Unexpected Error: {e}")
 
-                        if coin_balance * usd_value > 0:
+                        if coin_balance * usd_value > 1:
                             self.logger.info(
                                 f"Set a sell order with value " + str(usd_value * (1 - self.config.MAXIMUM_LOSS / 100))
                             )
-                            self.manager.set_sell_stop_loss_order(
-                                coin.symbol, self.config.BRIDGE_SYMBOL, usd_value, coin_balance
-                            )
+                            self.manager.set_sell_stop_loss_order(coin.symbol, self.config.BRIDGE_SYMBOL, usd_value)
 
-                        elif bridge_balance > 0:
+                        elif bridge_balance > 1:
                             self.logger.info(
                                 f"Set stop loss order to buy at "
                                 + str(usd_value * (1 + self.config.MAXIMUM_LOSS / 100))
