@@ -225,23 +225,28 @@ class AutoTrader:
                     else:
                         self.manager.cancel_previous_orders(coin.symbol, self.config.BRIDGE_SYMBOL)
 
+                        coin_balance = 0
+                        bridge_balance = 0
+
                         try:
-                            coin_balance = self.manager.get_currency_balance(coin.symbol)
-                            self.manager.set_sell_stop_loss_order(
-                                coin.symbol, self.config.BRIDGE_SYMBOL, usd_value, coin_balance
-                            )
-                            self.logger.info(
-                                f"Will first try to set a sell order with value "
-                                + str(usd_value * (1 - self.config.MAXIMUM_LOSS / 100))
+                            coin_balance = float(self.manager.binance_client.get_asset_balance(coin.symbol)["free"])
+                            bridge_balance = float(
+                                self.manager.binance_client.get_asset_balance(self.config.BRIDGE_SYMBOL)["free"]
                             )
                         except Exception as e:  # pylint: disable=broad-except
                             self.logger.warning(f"Unexpected Error: {e}")
 
-                        try:
-                            self.manager.set_buy_stop_loss_order(self.config.BRIDGE_SYMBOL, coin.symbol, usd_value)
+                        if coin_balance * usd_value > 0:
                             self.logger.info(
-                                f"Will secondly try to set stop loss order to buy at "
+                                f"Set a sell order with value " + str(usd_value * (1 - self.config.MAXIMUM_LOSS / 100))
+                            )
+                            self.manager.set_sell_stop_loss_order(
+                                coin.symbol, self.config.BRIDGE_SYMBOL, usd_value, coin_balance
+                            )
+
+                        elif bridge_balance > 0:
+                            self.logger.info(
+                                f"Set stop loss order to buy at "
                                 + str(usd_value * (1 + self.config.MAXIMUM_LOSS / 100))
                             )
-                        except Exception as e:  # pylint: disable=broad-except
-                            self.logger.warning(f"Unexpected Error: {e}")
+                            self.manager.set_buy_stop_loss_order(self.config.BRIDGE_SYMBOL, coin.symbol, usd_value)
