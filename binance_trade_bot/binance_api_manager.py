@@ -175,7 +175,7 @@ class BinanceAPIManager:
         return float(self.get_symbol_filter(origin_symbol, target_symbol, "MIN_NOTIONAL")["minNotional"])
 
     def set_sell_stop_loss_order(
-        self, origin_symbol: str, target_symbol: str, price: float, order_quantity: float = 0.0
+        self, origin_symbol: str, target_symbol: str, price: float, order_quantity: float = 0.0, mul: float = None
     ):
         """
         Set a sell stop less order
@@ -190,12 +190,14 @@ class BinanceAPIManager:
                     else order_quantity
                 )
 
+                multiplier = mul if mul else 0.0
+
                 order = self.binance_client.create_order(
                     symbol=origin_symbol + target_symbol,
                     quantity=order_quantity,
                     type=self.binance_client.ORDER_TYPE_STOP_LOSS_LIMIT,
-                    price=round(price * (1 - self.config.MAXIMUM_LOSS / 100), precision),
-                    stopPrice=round(price * (1 - self.config.MAXIMUM_LOSS / 100), precision),
+                    price=round(price * (1 - multiplier / 100), precision),
+                    stopPrice=round(price * (1 - multiplier / 100), precision),
                     side=self.binance_client.SIDE_SELL,
                     timeInForce="GTC",
                 )
@@ -206,7 +208,9 @@ class BinanceAPIManager:
             except Exception as e:  # pylint: disable=broad-except
                 self.logger.warning(f"Unexpected Error: {e}")
 
-    def set_buy_stop_loss_order(self, origin_symbol: str, target_symbol: str, from_coin_price: float = None):
+    def set_buy_stop_loss_order(
+        self, origin_symbol: str, target_symbol: str, from_coin_price: float = None, mul: float = None
+    ):
         """
         Set a buy stop less order
         """
@@ -218,7 +222,8 @@ class BinanceAPIManager:
         from_coin_price = from_coin_price or self.get_ticker_price(origin_symbol + target_symbol)
 
         precision = price_decimals(from_coin_price)
-        price = round(from_coin_price * (1 + self.config.MAXIMUM_LOSS / 100), precision)
+        multiplier = mul if mul else 0.0
+        price = round(from_coin_price * (1 + multiplier / 100), precision)
         order_quantity = self._buy_quantity(origin_symbol, target_symbol, target_balance, price)
 
         order = None
