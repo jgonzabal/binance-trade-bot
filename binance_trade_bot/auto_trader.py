@@ -202,12 +202,15 @@ class AutoTrader:
                         for order in orders:
                             if (
                                 order["side"] == self.manager.binance_client.SIDE_SELL
-                                and order["stopPrice"] > usd_value
+                                and float(order["stopPrice"]) > usd_value
                             ):
                                 self.manager.cancel_order(order["symbol"], order["orderId"])
                                 continue
 
-                            if order["side"] == self.manager.binance_client.SIDE_BUY and order["stopPrice"] < usd_value:
+                            if (
+                                order["side"] == self.manager.binance_client.SIDE_BUY
+                                and float(order["stopPrice"]) < usd_value
+                            ):
                                 self.manager.cancel_order(order["symbol"], order["orderId"])
                                 continue
 
