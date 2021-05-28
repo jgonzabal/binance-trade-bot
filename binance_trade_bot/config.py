@@ -32,6 +32,7 @@ class Config:  # pylint: disable=too-few-public-methods,too-many-instance-attrib
             "update_sell_mul": "4",
             "sell_order_type": self.ORDER_TYPE_MARKET,
             "buy_order_type": self.ORDER_TYPE_LIMIT,
+            "max_idle_hours": "12"
         }
 
         if not os.path.exists(CFG_FL_NAME):
@@ -118,3 +119,8 @@ class Config:  # pylint: disable=too-few-public-methods,too-many-instance-attrib
                 "comment this line only if you know what you're doing"
             )
         self.BUY_ORDER_TYPE = order_type_map[buy_order_type]
+
+        # Get Max Idle Hours
+        self.MAX_IDLE_HOURS = float(
+            os.environ.get("MAX_IDLE_HOURS") or config.get(USER_CFG_SECTION, "max_idle_hours")
+        )
