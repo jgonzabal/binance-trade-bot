@@ -189,6 +189,19 @@ class AutoTrader:
                 session.add(cv)
                 self.db.send_update(cv)
 
+    def update_orders(self):
+        """
+        Update trading strategy while you are in a coin
+        """
+
+        session: Session
+        with self.db.db_session() as session:
+            coins: List[Coin] = session.query(Coin).all()
+            for coin in coins:
+                balance = self.manager.get_currency_balance(coin.symbol)
+                if balance == 0:
+                    continue
+                usd_value = self.manager.get_ticker_price(coin + "USDT")
                 current_coin = self.db.get_current_coin()
 
                 if current_coin.symbol == coin.symbol and coin.symbol != self.config.BRIDGE_SYMBOL:
@@ -218,11 +231,11 @@ class AutoTrader:
                                 "stopPrice" in order
                                 and order["side"] == self.manager.binance_client.SIDE_SELL
                                 and float(order["stopPrice"]) > 0.0
-                                and float(order["stopPrice"]) < usd_value * (1 - self.config.MAXIMUM_LOSS / 100)
+                                and float(order["stopPrice"]) < usd_value * (1 - self.config.UPDATE_SELL_MUL / 100)
                             ):
                                 self.logger.info(
                                     f"Updating stop loss sell to "
-                                    + str(usd_value * (1 - self.config.MAXIMUM_LOSS / 100))
+                                    + str(usd_value * (1 - self.config.UPDATE_SELL_MUL / 100))
                                 )
                                 self.manager.cancel_order(order["symbol"], order["orderId"])
                                 self.manager.set_sell_stop_loss_order(
@@ -236,11 +249,11 @@ class AutoTrader:
                                 "stopPrice" in order
                                 and order["side"] == self.manager.binance_client.SIDE_BUY
                                 and float(order["stopPrice"]) > 0.0
-                                and float(order["stopPrice"]) > usd_value * (1 + self.config.MAXIMUM_LOSS / 100)
+                                and float(order["stopPrice"]) > usd_value * (1 + self.config.UPDATE_BUY_MUL / 100)
                             ):
                                 self.logger.info(
                                     f"Updating stop loss buy to "
-                                    + str(usd_value * (1 + self.config.MAXIMUM_LOSS / 100))
+                                    + str(usd_value * (1 + self.config.UPDATE_BUY_MUL / 100))
                                 )
                                 self.manager.cancel_order(order["symbol"], order["orderId"])
                                 self.manager.set_buy_stop_loss_order(
@@ -261,7 +274,7 @@ class AutoTrader:
                         if coin_balance * usd_value > 1:
                             self.logger.info(
                                 f"Set stop loss order to sell at "
-                                + str(usd_value * (1 - self.config.MAXIMUM_LOSS / 100))
+                                + str(usd_value * (1 - self.config.FIRST_SELL_MUL / 100))
                             )
                             self.manager.set_sell_stop_loss_order(
                                 coin.symbol, self.config.BRIDGE_SYMBOL, usd_value, mul=self.config.FIRST_SELL_MUL
@@ -270,7 +283,7 @@ class AutoTrader:
                         elif bridge_balance > 1:
                             self.logger.info(
                                 f"Set stop loss order to buy at "
-                                + str(usd_value * (1 + self.config.MAXIMUM_LOSS / 100))
+                                + str(usd_value * (1 + self.config.FIRST_BUY_MUL / 100))
                             )
                             self.manager.set_buy_stop_loss_order(
                                 coin.symbol, self.config.BRIDGE_SYMBOL, usd_value, mul=self.config.FIRST_BUY_MUL
