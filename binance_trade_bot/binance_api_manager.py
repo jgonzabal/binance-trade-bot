@@ -65,7 +65,7 @@ class BinanceAPIManager:
 
     @cached(cache=TTLCache(maxsize=1, ttl=43200))
     def get_trade_fees(self) -> Dict[str, float]:
-        return {ticker["symbol"]: ticker["taker"] for ticker in self.binance_client.get_trade_fee()["tradeFee"]}
+        return {ticker["symbol"]: float(ticker["takerCommission"]) for ticker in self.binance_client.get_trade_fee()}
 
     @cached(cache=TTLCache(maxsize=1, ttl=60))
     def get_using_bnb_for_fees(self):
@@ -297,8 +297,6 @@ class BinanceAPIManager:
                 self.logger.info(f"Unexpected Error: {e}")
                 time.sleep(1)
 
-        # self.set_sell_stop_loss_order(origin_symbol, target_symbol, order_status.price, float(order_quantity))
-
         self.logger.debug(f"Order filled: {order_status}")
         return order_status
 
@@ -331,8 +329,8 @@ class BinanceAPIManager:
 
         return False
 
-    def buy_alt(self, origin_coin: Coin, target_coin: Coin) -> BinanceOrder:
-        return self.retry(self._buy_alt, origin_coin, target_coin)
+    def buy_alt(self, origin_coin: Coin, target_coin: Coin, buy_price: float) -> BinanceOrder:
+        return self.retry(self._buy_alt, origin_coin, target_coin, buy_price)
 
     def _buy_quantity(
         self, origin_symbol: str, target_symbol: str, target_balance: float = None, from_coin_price: float = None
@@ -343,11 +341,36 @@ class BinanceAPIManager:
         origin_tick = self.get_alt_tick(origin_symbol, target_symbol)
         return math.floor(target_balance * 10 ** origin_tick / from_coin_price) / float(10 ** origin_tick)
 
-    def _buy_alt(self, origin_coin: Coin, target_coin: Coin):
+    @staticmethod
+    def float_as_decimal_str(num: float):
+        return f"{num:0.08f}".rstrip("0").rstrip(".")  # remove trailing zeroes too
+
+    def _make_order(
+        self,
+        side: str,
+        symbol: str,
+        quantity: float,
+        price: float,
+        quote_quantity: float,
+    ):
+        params = {
+            "symbol": symbol,
+            "side": side,
+            "quantity": self.float_as_decimal_str(quantity),
+            "type": self.config.BUY_ORDER_TYPE if side == Client.SIDE_BUY else self.config.SELL_ORDER_TYPE,
+        }
+        if params["type"] == Client.ORDER_TYPE_LIMIT:
+            params["timeInForce"] = self.binance_client.TIME_IN_FORCE_GTC
+            params["price"] = self.float_as_decimal_str(price)
+        elif side == Client.SIDE_BUY:
+            del params["quantity"]
+            params["quoteOrderQty"] = self.float_as_decimal_str(quote_quantity)
+        return self.binance_client.create_order(**params)
+
+    def _buy_alt(self, origin_coin: Coin, target_coin: Coin, buy_price: float):  # pylint: disable=too-many-locals
         """
         Buy altcoin
         """
-        trade_log = self.db.start_trade_log(origin_coin, target_coin, False)
         origin_symbol = origin_coin.symbol
         target_symbol = target_coin.symbol
 
@@ -357,6 +380,11 @@ class BinanceAPIManager:
         origin_balance = self.get_currency_balance(origin_symbol)
         target_balance = self.get_currency_balance(target_symbol)
         from_coin_price = self.get_ticker_price(origin_symbol + target_symbol)
+        if from_coin_price > buy_price:
+            self.logger.info("Buy price became higher, cancel buy")
+            return None
+        from_coin_price = min(buy_price, from_coin_price)
+        trade_log = self.db.start_trade_log(origin_coin, target_coin, False)
 
         order_quantity = self._buy_quantity(origin_symbol, target_symbol, target_balance, from_coin_price)
         self.logger.info(f"BUY QTY {order_quantity} of <{origin_symbol}>")
@@ -366,9 +394,11 @@ class BinanceAPIManager:
         order_guard = self.stream_manager.acquire_order_guard()
         while order is None:
             try:
-                order = self.binance_client.order_limit_buy(
+                order = self._make_order(
+                    side=Client.SIDE_BUY,
                     symbol=origin_symbol + target_symbol,
                     quantity=order_quantity,
+                    quote_quantity=target_balance,
                     price=from_coin_price,
                 )
                 self.logger.info(order)
@@ -377,6 +407,10 @@ class BinanceAPIManager:
                 time.sleep(1)
             except Exception as e:  # pylint: disable=broad-except
                 self.logger.warning(f"Unexpected Error: {e}")
+
+        executed_qty = float(order.get("executedQty", 0))
+        if executed_qty > 0 and order["status"] == "FILLED":
+            order_quantity = executed_qty  # Market buys provide QTY of actually bought asset
 
         trade_log.set_ordered(origin_balance, target_balance, order_quantity)
 
@@ -392,8 +426,8 @@ class BinanceAPIManager:
 
         return order
 
-    def sell_alt(self, origin_coin: Coin, target_coin: Coin) -> BinanceOrder:
-        return self.retry(self._sell_alt, origin_coin, target_coin)
+    def sell_alt(self, origin_coin: Coin, target_coin: Coin, sell_price: float) -> BinanceOrder:
+        return self.retry(self._sell_alt, origin_coin, target_coin, sell_price)
 
     def _sell_quantity(self, origin_symbol: str, target_symbol: str, origin_balance: float = None):
         origin_balance = origin_balance or self.get_currency_balance(origin_symbol)
@@ -441,20 +475,26 @@ class BinanceAPIManager:
         while cancel_order is None:
             cancel_order = self.binance_client.cancel_order(symbol=symbol, orderId=orderId)
 
-    def _sell_alt(self, origin_coin: Coin, target_coin: Coin):
+    def _sell_alt(self, origin_coin: Coin, target_coin: Coin, sell_price: float):
         """
         Sell altcoin
         """
-        trade_log = self.db.start_trade_log(origin_coin, target_coin, True)
         origin_symbol = origin_coin.symbol
         target_symbol = target_coin.symbol
 
+        # get fresh balances
         with self.cache.open_balances() as balances:
             balances.clear()
 
         origin_balance = self.get_currency_balance(origin_symbol)
         target_balance = self.get_currency_balance(target_symbol)
         from_coin_price = self.get_ticker_price(origin_symbol + target_symbol)
+        if from_coin_price < sell_price:
+            self.logger.info("Sell price became lower, skipping sell")
+            return None  # skip selling below price from ratio
+        from_coin_price = max(from_coin_price, sell_price)
+
+        trade_log = self.db.start_trade_log(origin_coin, target_coin, True)
 
         order_quantity = self._sell_quantity(origin_symbol, target_symbol, origin_balance)
         self.logger.info(f"Selling {order_quantity} of {origin_symbol}")
@@ -463,10 +503,20 @@ class BinanceAPIManager:
         order = None
         order_guard = self.stream_manager.acquire_order_guard()
         while order is None:
-            # Should sell at calculated price to avoid lost coin
-            order = self.binance_client.order_limit_sell(
-                symbol=origin_symbol + target_symbol, quantity=order_quantity, price=from_coin_price
-            )
+            try:
+                order = self._make_order(
+                    side=Client.SIDE_SELL,
+                    symbol=origin_symbol + target_symbol,
+                    quantity=order_quantity,
+                    quote_quantity=target_balance,
+                    price=from_coin_price,
+                )
+                self.logger.info(order)
+            except BinanceAPIException as e:
+                self.logger.info(e)
+                time.sleep(1)
+            except Exception as e:  # pylint: disable=broad-except
+                self.logger.warning(f"Unexpected Error: {e}")
 
         self.logger.info("order")
         self.logger.info(order)

@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from .binance_api_manager import BinanceAPIManager
 from .config import Config
-from .database import Database
+from .database import Database, LogScout
 from .logger import Logger
 from .models import Coin, CoinValue, Pair
 
@@ -20,7 +20,7 @@ class AutoTrader:
     def initialize(self):
         self.initialize_trade_thresholds()
 
-    def transaction_through_bridge(self, pair: Pair):
+    def transaction_through_bridge(self, pair: Pair, sell_price: float, buy_price: float):
         """
         Jump from the source coin to the destination coin through bridge coin
         """
@@ -28,23 +28,26 @@ class AutoTrader:
 
         can_sell = False
         balance = self.manager.get_currency_balance(pair.from_coin.symbol)
-        from_coin_price = self.manager.get_ticker_price(pair.from_coin + self.config.BRIDGE)
 
-        if balance and balance * from_coin_price > self.manager.get_min_notional(
+        if balance and balance * sell_price > self.manager.get_min_notional(
             pair.from_coin.symbol, self.config.BRIDGE.symbol
         ):
             can_sell = True
         else:
             self.logger.info("Skipping sell")
 
-        if can_sell and self.manager.sell_alt(pair.from_coin, self.config.BRIDGE) is None:
+        if can_sell and self.manager.sell_alt(pair.from_coin, self.config.BRIDGE, sell_price) is None:
             self.logger.info("Couldn't sell, going back to scouting mode...")
             return None
 
-        result = self.manager.buy_alt(pair.to_coin, self.config.BRIDGE)
+        result = self.manager.buy_alt(pair.to_coin, self.config.BRIDGE, buy_price)
         if result is not None:
             self.db.set_current_coin(pair.to_coin)
-            self.update_trade_threshold(pair.to_coin, result.price)
+            price = result.price
+            if abs(price) < 1e-15:
+                price = result.cumulative_filled_quantity / result.cumulative_quote_qty
+
+            self.update_trade_threshold(pair.to_coin, price)
             return result
 
         self.logger.info("Couldn't buy, going back to scouting mode...")
@@ -110,9 +113,12 @@ class AutoTrader:
         Given a coin, get the current price ratio for every other enabled coin
         """
         ratio_dict: Dict[Pair, float] = {}
+        prices: Dict[str, float] = {}
 
+        scout_logs = []
         for pair in self.db.get_pairs_from(coin):
             optional_coin_price = self.manager.get_ticker_price(pair.to_coin + self.config.BRIDGE)
+            prices[pair.to_coin_id] = optional_coin_price
 
             if optional_coin_price is None:
                 self.logger.info(
@@ -120,7 +126,7 @@ class AutoTrader:
                 )
                 continue
 
-            self.db.log_scout(pair, pair.ratio, coin_price, optional_coin_price)
+            scout_logs.append(LogScout(pair, pair.ratio, coin_price, optional_coin_price))
 
             # Obtain (current coin)/(optional coin)
             coin_opt_coin_ratio = coin_price / optional_coin_price
@@ -132,13 +138,14 @@ class AutoTrader:
             ratio_dict[pair] = (
                 coin_opt_coin_ratio - transaction_fee * self.config.SCOUT_MULTIPLIER * coin_opt_coin_ratio
             ) - pair.ratio
-        return ratio_dict
+        self.db.batch_log_scout(scout_logs)
+        return (ratio_dict, prices)
 
     def _jump_to_best_coin(self, coin: Coin, coin_price: float):
         """
         Given a coin, search for a coin to jump to
         """
-        ratio_dict = self._get_ratios(coin, coin_price)
+        ratio_dict, prices = self._get_ratios(coin, coin_price)
 
         # keep only ratios bigger than zero
         ratio_dict = {k: v for k, v in ratio_dict.items() if v > 0}
@@ -147,7 +154,7 @@ class AutoTrader:
         if ratio_dict:
             best_pair = max(ratio_dict, key=ratio_dict.get)
             self.logger.info(f"Will be jumping from {coin} to {best_pair.to_coin_id}")
-            self.transaction_through_bridge(best_pair)
+            self.transaction_through_bridge(best_pair, coin_price, prices[best_pair.to_coin_id])
 
     def bridge_scout(self):
         """
@@ -161,13 +168,17 @@ class AutoTrader:
             if current_coin_price is None:
                 continue
 
-            ratio_dict = self._get_ratios(coin, current_coin_price)
+            ratio_dict, _ = self._get_ratios(coin, current_coin_price)
             if not any(v > 0 for v in ratio_dict.values()):
                 # There will only be one coin where all the ratios are negative. When we find it, buy it if we can
                 if bridge_balance > self.manager.get_min_notional(coin.symbol, self.config.BRIDGE.symbol):
                     self.logger.info(f"Will be purchasing {coin} using bridge coin")
-                    self.manager.buy_alt(coin, self.config.BRIDGE)
-                    return coin
+                    result = self.manager.buy_alt(
+                        coin, self.config.BRIDGE, self.manager.get_ticker_price(coin + self.config.BRIDGE)
+                    )
+                    if result is not None:
+                        self.db.set_current_coin(coin)
+                        return coin
         return None
 
     def update_values(self):
@@ -176,18 +187,17 @@ class AutoTrader:
         """
         now = datetime.now()
 
-        session: Session
-        with self.db.db_session() as session:
-            coins: List[Coin] = session.query(Coin).all()
-            for coin in coins:
-                balance = self.manager.get_currency_balance(coin.symbol)
-                if balance == 0:
-                    continue
-                usd_value = self.manager.get_ticker_price(coin + "USDT")
-                btc_value = self.manager.get_ticker_price(coin + "BTC")
-                cv = CoinValue(coin, balance, usd_value, btc_value, datetime=now)
-                session.add(cv)
-                self.db.send_update(cv)
+        coins = self.db.get_coins(False)
+        cv_batch = []
+        for coin in coins:
+            balance = self.manager.get_currency_balance(coin.symbol)
+            if balance == 0:
+                continue
+            usd_value = self.manager.get_ticker_price(coin + "USDT")
+            btc_value = self.manager.get_ticker_price(coin + "BTC")
+            cv = CoinValue(coin, balance, usd_value, btc_value, datetime=now)
+            cv_batch.append(cv)
+        self.db.batch_update_coin_values(cv_batch)
 
     def update_orders(self):
         """

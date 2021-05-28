@@ -1,7 +1,7 @@
 # binance-trade-bot
 
 ![github](https://img.shields.io/github/workflow/status/edeng23/binance-trade-bot/binance-trade-bot)
-![docker](https://img.shields.io/docker/pulls/edeng23/binance-trade-bot)
+![docker](https://img.shields.io/docker/pulls/idkravitz/binance-trade-bot)
 
 > Automated cryptocurrency trading bot
 
@@ -59,6 +59,8 @@ Create a .cfg file named `user.cfg` based off `.user.cfg.example`, then add your
 -   **strategy** - The trading strategy to use. See [`binance_trade_bot/strategies`](binance_trade_bot/strategies/README.md) for more information
 -   **buy_timeout/sell_timeout** - Controls how many minutes to wait before cancelling a limit order (buy/sell) and returning to "scout" mode. 0 means that the order will never be cancelled prematurely.
 -   **scout_sleep_time** - Controls how many seconds bot should wait between analysis of current prices. Since the bot now operates on websockets this value should be set to something low (like 1), the reasons to set it above 1 are when you observe high CPU usage by bot or you got api errors about requests weight limit.
+-   **buy_order_type** - Controls the type of placed buy orders, types available: market, limit (default=limit)
+-   **sell_order_type** - Controls the type of placed sell orders, types available: market, limit (default=market)
 
 #### Environment Variables
 
@@ -76,6 +78,8 @@ TLD: com
 STRATEGY: default
 BUY_TIMEOUT: 0
 SELL_TIMEOUT: 0
+BUY_ORDER_TYPE: limit
+SELL_ORDER_TYPE: market
 ```
 
 ### Paying Fees with BNB
@@ -102,7 +106,7 @@ python -m binance_trade_bot
 
 ### Docker
 
-The official image is available [here](https://hub.docker.com/r/edeng23/binance-trade-bot) and will update on every new change.
+The official image is available [here](https://hub.docker.com/r/idkravitz/binance-trade-bot) and will update on every new change.
 
 ```shell
 docker-compose up

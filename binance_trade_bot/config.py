@@ -1,6 +1,7 @@
-# Config consts
 import configparser
 import os
+
+import binance.client
 
 from .models import Coin
 
@@ -9,6 +10,9 @@ USER_CFG_SECTION = "binance_user_config"
 
 
 class Config:  # pylint: disable=too-few-public-methods,too-many-instance-attributes
+    ORDER_TYPE_MARKET = "market"
+    ORDER_TYPE_LIMIT = "limit"
+
     def __init__(self):
         # Init config
         config = configparser.ConfigParser()
@@ -26,6 +30,8 @@ class Config:  # pylint: disable=too-few-public-methods,too-many-instance-attrib
             "first_sell_mul": "1",
             "update_buy_mul": "4",
             "update_sell_mul": "4",
+            "sell_order_type": self.ORDER_TYPE_MARKET,
+            "buy_order_type": self.ORDER_TYPE_LIMIT,
         }
 
         if not os.path.exists(CFG_FL_NAME):
@@ -82,3 +88,33 @@ class Config:  # pylint: disable=too-few-public-methods,too-many-instance-attrib
         self.UPDATE_SELL_MUL = float(
             os.environ.get("UPDATE_SELL_MUL") or config.get(USER_CFG_SECTION, "update_sell_mul")
         )
+
+        order_type_map = {
+            self.ORDER_TYPE_LIMIT: binance.client.Client.ORDER_TYPE_LIMIT,
+            self.ORDER_TYPE_MARKET: binance.client.Client.ORDER_TYPE_MARKET,
+        }
+
+        sell_order_type = os.environ.get("SELL_ORDER_TYPE") or config.get(
+            USER_CFG_SECTION, "sell_order_type", fallback=self.ORDER_TYPE_MARKET
+        )
+        if sell_order_type not in order_type_map:
+            raise Exception(
+                f"{self.ORDER_TYPE_LIMIT} or {self.ORDER_TYPE_MARKET} expected, got {sell_order_type}"
+                "for sell_order_type"
+            )
+        self.SELL_ORDER_TYPE = order_type_map[sell_order_type]
+
+        buy_order_type = os.environ.get("BUY_ORDER_TYPE") or config.get(
+            USER_CFG_SECTION, "buy_order_type", fallback=self.ORDER_TYPE_LIMIT
+        )
+        if buy_order_type not in order_type_map:
+            raise Exception(
+                f"{self.ORDER_TYPE_LIMIT} or {self.ORDER_TYPE_MARKET} expected, got {buy_order_type}"
+                "for buy_order_type"
+            )
+        if buy_order_type == self.ORDER_TYPE_MARKET:
+            raise Exception(
+                "Market buys are reported to do extreme losses, they are disabled right now,"
+                "comment this line only if you know what you're doing"
+            )
+        self.BUY_ORDER_TYPE = order_type_map[buy_order_type]
