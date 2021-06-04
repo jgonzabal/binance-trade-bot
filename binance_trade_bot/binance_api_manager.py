@@ -40,10 +40,6 @@ def price_decimals(f):
     return decimals
 
 
-def now():
-    return datetime.now()
-
-
 class BinanceAPIManager:
     def __init__(self, config: Config, db: Database, logger: Logger):
         # initializing the client class calls `ping` API endpoint, verifying the connection
@@ -59,6 +55,10 @@ class BinanceAPIManager:
         self.cache = BinanceCache()
         self.stream_manager: Optional[BinanceStreamManager] = None
         self.setup_websockets()
+
+    # pylint: disable=R0201
+    def now(self):
+        return datetime.now()
 
     def setup_websockets(self):
         self.stream_manager = BinanceStreamManager(
