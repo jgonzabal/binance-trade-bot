@@ -13,3 +13,7 @@ sell_timeout=0
 buy_order_type=limit
 sell_order_type=limit
 maximum_loss=5
+first_buy_mul=1
+first_sell_mul=1
+update_buy_mul=4
+update_sell_mul=4
