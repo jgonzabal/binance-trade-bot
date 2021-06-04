@@ -2,6 +2,7 @@ import decimal
 import math
 import time
 import traceback
+from datetime import datetime
 from typing import Dict, Optional
 
 from binance.client import Client
@@ -39,6 +40,10 @@ def price_decimals(f):
     return decimals
 
 
+def now():
+    return datetime.now()
+
+
 class BinanceAPIManager:
     def __init__(self, config: Config, db: Database, logger: Logger):
         # initializing the client class calls `ping` API endpoint, verifying the connection
@@ -72,6 +77,9 @@ class BinanceAPIManager:
         return self.binance_client.get_bnb_burn_spot_margin()["spotBNBBurn"]
 
     def get_fee(self, origin_coin: Coin, target_coin: Coin, selling: bool):
+        if self.config.TRADE_FEE != "auto":
+            return float(self.config.TRADE_FEE)
+
         base_fee = self.get_trade_fees()[origin_coin + target_coin]
         if not self.get_using_bnb_for_fees():
             return base_fee
@@ -104,6 +112,20 @@ class BinanceAPIManager:
         """
         return self.binance_client.get_account()
 
+    def get_buy_price(self, ticker_symbol: str):
+        price_type = self.config.PRICE_TYPE
+        if price_type == Config.PRICE_TYPE_ORDERBOOK:
+            return self.get_ask_price(ticker_symbol)
+
+        return self.get_ticker_price(ticker_symbol)
+
+    def get_sell_price(self, ticker_symbol: str):
+        price_type = self.config.PRICE_TYPE
+        if price_type == Config.PRICE_TYPE_ORDERBOOK:
+            return self.get_bid_price(ticker_symbol)
+
+        return self.get_ticker_price(ticker_symbol)
+
     def get_ticker_price(self, ticker_symbol: str):
         """
         Get ticker price of a specific coin
@@ -115,6 +137,46 @@ class BinanceAPIManager:
             }
             self.logger.debug(f"Fetched all ticker prices: {self.cache.ticker_values}")
             price = self.cache.ticker_values.get(ticker_symbol, None)
+            if price is None:
+                self.logger.info(f"Ticker does not exist: {ticker_symbol} - will not be fetched from now on")
+                self.cache.non_existent_tickers.add(ticker_symbol)
+
+        return price
+
+    def get_ask_price(self, ticker_symbol: str):
+        """
+        Get best ask price of a specific coin
+        """
+        price = self.cache.ticker_values_ask.get(ticker_symbol, None)
+        if price is None and ticker_symbol not in self.cache.non_existent_tickers:
+            try:
+                ticker = self.binance_client.get_orderbook_ticker(symbol=ticker_symbol)
+                price = float(ticker["askPrice"])
+            except BinanceAPIException as e:
+                if e.code == -1121:  # invalid symbol
+                    price = None
+                else:
+                    raise e
+            if price is None:
+                self.logger.info(f"Ticker does not exist: {ticker_symbol} - will not be fetched from now on")
+                self.cache.non_existent_tickers.add(ticker_symbol)
+
+        return price
+
+    def get_bid_price(self, ticker_symbol: str):
+        """
+        Get best bid price of a specific coin
+        """
+        price = self.cache.ticker_values_bid.get(ticker_symbol, None)
+        if price is None and ticker_symbol not in self.cache.non_existent_tickers:
+            try:
+                ticker = self.binance_client.get_orderbook_ticker(symbol=ticker_symbol)
+                price = float(ticker["bidPrice"])
+            except BinanceAPIException as e:
+                if e.code == -1121:  # invalid symbol
+                    price = None
+                else:
+                    raise e
             if price is None:
                 self.logger.info(f"Ticker does not exist: {ticker_symbol} - will not be fetched from now on")
                 self.cache.non_existent_tickers.add(ticker_symbol)
@@ -323,7 +385,7 @@ class BinanceAPIManager:
                 return True
 
             if order_status.side == "BUY":
-                current_price = self.get_ticker_price(order_status.symbol)
+                current_price = self.get_buy_price(order_status.symbol)
                 if float(current_price) * (1 - 0.001) > float(order_status.price):
                     return True
 
@@ -336,7 +398,7 @@ class BinanceAPIManager:
         self, origin_symbol: str, target_symbol: str, target_balance: float = None, from_coin_price: float = None
     ):
         target_balance = target_balance or self.get_currency_balance(target_symbol)
-        from_coin_price = from_coin_price or self.get_ticker_price(origin_symbol + target_symbol)
+        from_coin_price = from_coin_price or self.get_buy_price(origin_symbol + target_symbol)
 
         origin_tick = self.get_alt_tick(origin_symbol, target_symbol)
         return math.floor(target_balance * 10 ** origin_tick / from_coin_price) / float(10 ** origin_tick)
@@ -348,13 +410,13 @@ class BinanceAPIManager:
     def _make_order(
         self,
         side: str,
-        symbol: str,
+        coinSymbol: str,
         quantity: float,
         price: float,
         quote_quantity: float,
     ):
         params = {
-            "symbol": symbol,
+            "symbol": coinSymbol,
             "side": side,
             "quantity": self.float_as_decimal_str(quantity),
             "type": self.config.BUY_ORDER_TYPE if side == Client.SIDE_BUY else self.config.SELL_ORDER_TYPE,
@@ -379,11 +441,13 @@ class BinanceAPIManager:
 
         origin_balance = self.get_currency_balance(origin_symbol)
         target_balance = self.get_currency_balance(target_symbol)
-        from_coin_price = self.get_ticker_price(origin_symbol + target_symbol)
-        if from_coin_price > buy_price:
+        from_coin_price = self.get_buy_price(origin_symbol + target_symbol)
+
+        buy_max_price_change = float(self.config.BUY_MAX_PRICE_CHANGE)
+        if from_coin_price > buy_price * (1.0 + buy_max_price_change):
             self.logger.info("Buy price became higher, cancel buy")
             return None
-        from_coin_price = min(buy_price, from_coin_price)
+        # from_coin_price = min(buy_price, from_coin_price)
         trade_log = self.db.start_trade_log(origin_coin, target_coin, False)
 
         order_quantity = self._buy_quantity(origin_symbol, target_symbol, target_balance, from_coin_price)
@@ -396,7 +460,7 @@ class BinanceAPIManager:
             try:
                 order = self._make_order(
                     side=Client.SIDE_BUY,
-                    symbol=origin_symbol + target_symbol,
+                    coinSymbol=origin_symbol + target_symbol,
                     quantity=order_quantity,
                     quote_quantity=target_balance,
                     price=from_coin_price,
@@ -467,13 +531,13 @@ class BinanceAPIManager:
                         symbol=origin_symbol + target_symbol, orderId=order["orderId"]
                     )
 
-    def cancel_order(self, symbol: str, orderId: str):
+    def cancel_order(self, coinSymbol: str, orderId: str):
         """
         Check if there are previous orders and cancel
         """
         cancel_order = None
         while cancel_order is None:
-            cancel_order = self.binance_client.cancel_order(symbol=symbol, orderId=orderId)
+            cancel_order = self.binance_client.cancel_order(symbol=coinSymbol, orderId=orderId)
 
     def _sell_alt(self, origin_coin: Coin, target_coin: Coin, sell_price: float):
         """
@@ -488,11 +552,13 @@ class BinanceAPIManager:
 
         origin_balance = self.get_currency_balance(origin_symbol)
         target_balance = self.get_currency_balance(target_symbol)
-        from_coin_price = self.get_ticker_price(origin_symbol + target_symbol)
-        if from_coin_price < sell_price:
+        from_coin_price = self.get_sell_price(origin_symbol + target_symbol)
+
+        sell_max_price_change = float(self.config.SELL_MAX_PRICE_CHANGE)
+        if from_coin_price < sell_price * (1.0 - sell_max_price_change):
             self.logger.info("Sell price became lower, skipping sell")
             return None  # skip selling below price from ratio
-        from_coin_price = max(from_coin_price, sell_price)
+        # from_coin_price = max(from_coin_price, sell_price)
 
         trade_log = self.db.start_trade_log(origin_coin, target_coin, True)
 
@@ -506,7 +572,7 @@ class BinanceAPIManager:
             try:
                 order = self._make_order(
                     side=Client.SIDE_SELL,
-                    symbol=origin_symbol + target_symbol,
+                    coinSymbol=origin_symbol + target_symbol,
                     quantity=order_quantity,
                     quote_quantity=target_balance,
                     price=from_coin_price,

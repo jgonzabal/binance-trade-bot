@@ -56,11 +56,15 @@ Create a .cfg file named `user.cfg` based off `.user.cfg.example`, then add your
 -   **tld** - 'com' or 'us', depending on your region. Default is 'com'.
 -   **hourToKeepScoutHistory** - Controls how many hours of scouting values are kept in the database. After the amount of time specified has passed, the information will be deleted.
 -   **scout_multiplier** - Controls the value by which the difference between the current state of coin ratios and previous state of ratios is multiplied. For bigger values, the bot will wait for bigger margins to arrive before making a trade.
+-   **trade_fee** - Controls trade fee for calculating profitable jumps. By default it doesn't have value: gets values through the binance api calls. Otherwise use float values for the fee. [Binance fee table for reference](https://www.binance.com/en/fee/schedule)
 -   **strategy** - The trading strategy to use. See [`binance_trade_bot/strategies`](binance_trade_bot/strategies/README.md) for more information
 -   **buy_timeout/sell_timeout** - Controls how many minutes to wait before cancelling a limit order (buy/sell) and returning to "scout" mode. 0 means that the order will never be cancelled prematurely.
 -   **scout_sleep_time** - Controls how many seconds bot should wait between analysis of current prices. Since the bot now operates on websockets this value should be set to something low (like 1), the reasons to set it above 1 are when you observe high CPU usage by bot or you got api errors about requests weight limit.
 -   **buy_order_type** - Controls the type of placed buy orders, types available: market, limit (default=limit)
 -   **sell_order_type** - Controls the type of placed sell orders, types available: market, limit (default=market)
+-   **buy_max_price_change/sell_max_price_change** - Controls how much price change in decimal percentage is accepted between calculation of ratios and trading.
+-   **price_type** - Controls the type of prices used by the bot, types available: orderbook, ticker (default=orderbook). Please note that using the orderbook prices increase the CPU usage.
+    **max_idle_hours** - Controls the amount of hours for reseting the ratios when the bot has not traded 
 
 #### Environment Variables
 
@@ -127,6 +131,33 @@ python backtest.py
 ```
 
 Feel free to modify that file to test and compare different settings and time periods
+
+## Database warmup
+
+You can warmup your database with coins wich you might want to add later to your supported coin list. 
+This should prevent uncontrolled jumps when you add a new coin to your supported coin list.
+
+After the execution you should wait one or two trades of the bot before adding any new coin to your list.
+
+By running the script without parameters, it will warm up the bots default database with all available coins for the bridge.
+
+```shell
+python3 database_warmup.py
+```
+
+If you want to specify a separate db file you can use the -d or --dbfile parameter.
+If not provided, the script will use the bots default db file.
+
+```shell
+python3 database_warmup.py -d data/warmup.db
+```
+
+You can also specify the coins you want to warmup with the -c or --coinlist parameter.
+If not provided the script will warmup all coins available for the bridge.
+
+```shell
+python3 database_warmup.py -c 'ADA BTC ETH LTC'
+```
 
 ## Developing
 

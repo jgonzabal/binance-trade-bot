@@ -17,6 +17,7 @@ class AutoTrader:
         self.db = database
         self.logger = logger
         self.config = config
+        self.failed_buy_order = False
 
     def initialize(self):
         self.initialize_trade_thresholds()
@@ -49,9 +50,11 @@ class AutoTrader:
                 price = result.cumulative_filled_quantity / result.cumulative_quote_qty
 
             self.update_trade_threshold(pair.to_coin, price)
+            self.failed_buy_order = False
             return result
 
         self.logger.info("Couldn't buy, going back to scouting mode...")
+        self.failed_buy_order = True
         return None
 
     def update_trade_threshold(self, coin: Coin, coin_price: float):
@@ -66,7 +69,7 @@ class AutoTrader:
         session: Session
         with self.db.db_session() as session:
             for pair in session.query(Pair).filter(Pair.to_coin == coin):
-                from_coin_price = self.manager.get_ticker_price(pair.from_coin + self.config.BRIDGE)
+                from_coin_price = self.manager.get_sell_price(pair.from_coin + self.config.BRIDGE)
 
                 if from_coin_price is None:
                     self.logger.info(
@@ -90,14 +93,14 @@ class AutoTrader:
             for from_coin_symbol, group in grouped_pairs.items():
                 self.logger.info(f"Initializing {from_coin_symbol} vs [{', '.join([p.to_coin.symbol for p in group])}]")
                 for pair in group:
-                    from_coin_price = self.manager.get_ticker_price(pair.from_coin + self.config.BRIDGE)
+                    from_coin_price = self.manager.get_sell_price(pair.from_coin + self.config.BRIDGE)
                     if from_coin_price is None:
                         self.logger.info(
                             "Skipping initializing {}, symbol not found".format(pair.from_coin + self.config.BRIDGE)
                         )
                         continue
 
-                    to_coin_price = self.manager.get_ticker_price(pair.to_coin + self.config.BRIDGE)
+                    to_coin_price = self.manager.get_buy_price(pair.to_coin + self.config.BRIDGE)
                     if to_coin_price is None:
                         self.logger.info(
                             "Skipping initializing {}, symbol not found".format(pair.to_coin + self.config.BRIDGE)
@@ -121,7 +124,7 @@ class AutoTrader:
 
         scout_logs = []
         for pair in self.db.get_pairs_from(coin):
-            optional_coin_price = self.manager.get_ticker_price(pair.to_coin + self.config.BRIDGE)
+            optional_coin_price = self.manager.get_buy_price(pair.to_coin + self.config.BRIDGE)
             prices[pair.to_coin_id] = optional_coin_price
 
             if optional_coin_price is None:
@@ -167,7 +170,7 @@ class AutoTrader:
         bridge_balance = self.manager.get_currency_balance(self.config.BRIDGE.symbol)
 
         for coin in self.db.get_coins():
-            current_coin_price = self.manager.get_ticker_price(coin + self.config.BRIDGE)
+            current_coin_price = self.manager.get_sell_price(coin + self.config.BRIDGE)
 
             if current_coin_price is None:
                 continue
@@ -178,11 +181,14 @@ class AutoTrader:
                 if bridge_balance > self.manager.get_min_notional(coin.symbol, self.config.BRIDGE.symbol):
                     self.logger.info(f"Will be purchasing {coin} using bridge coin")
                     result = self.manager.buy_alt(
-                        coin, self.config.BRIDGE, self.manager.get_ticker_price(coin + self.config.BRIDGE)
+                        coin, self.config.BRIDGE, self.manager.get_sell_price(coin + self.config.BRIDGE)
                     )
                     if result is not None:
                         self.db.set_current_coin(coin)
+                        self.failed_buy_order = False
                         return coin
+
+                    self.failed_buy_order = True
         return None
 
     def update_values(self):
@@ -247,7 +253,7 @@ class AutoTrader:
                                 and float(order["stopPrice"]) > 0.0
                                 and float(order["stopPrice"]) < usd_value * (1 - self.config.UPDATE_SELL_MUL / 100)
                             ):
-                                self.logger.info(
+                                self.logger.debug(
                                     f"Updating stop loss sell to "
                                     + str(usd_value * (1 - self.config.UPDATE_SELL_MUL / 100))
                                 )
@@ -265,7 +271,7 @@ class AutoTrader:
                                 and float(order["stopPrice"]) > 0.0
                                 and float(order["stopPrice"]) > usd_value * (1 + self.config.UPDATE_BUY_MUL / 100)
                             ):
-                                self.logger.info(
+                                self.logger.debug(
                                     f"Updating stop loss buy to "
                                     + str(usd_value * (1 + self.config.UPDATE_BUY_MUL / 100))
                                 )

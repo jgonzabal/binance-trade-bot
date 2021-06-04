@@ -14,6 +14,10 @@ class Strategy(AutoTrader):
         """
         Scout for potential jumps from the current coin to another coin
         """
+        # check if previous buy order failed. If so, bridge scout for a new coin.
+        if self.failed_buy_order:
+            self.bridge_scout()
+
         current_coin = self.db.get_current_coin()
         # Display on the console, the current coin+Bridge, so users can see *some* activity and not think the bot has
         # stopped. Not logging though to reduce log size.
@@ -23,7 +27,7 @@ class Strategy(AutoTrader):
             end="\r",
         )
 
-        current_coin_price = self.manager.get_ticker_price(current_coin + self.config.BRIDGE)
+        current_coin_price = self.manager.get_sell_price(current_coin + self.config.BRIDGE)
 
         if current_coin_price is None:
             self.logger.info("Skipping scouting... current coin {} not found".format(current_coin + self.config.BRIDGE))
@@ -62,6 +66,6 @@ class Strategy(AutoTrader):
                 current_coin = self.db.get_current_coin()
                 self.logger.info(f"Purchasing {current_coin} to begin trading")
                 self.manager.buy_alt(
-                    current_coin, self.config.BRIDGE, self.manager.get_ticker_price(current_coin + self.config.BRIDGE)
+                    current_coin, self.config.BRIDGE, self.manager.get_buy_price(current_coin + self.config.BRIDGE)
                 )
                 self.logger.info("Ready to start trading")

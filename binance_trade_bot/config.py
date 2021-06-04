@@ -13,6 +13,9 @@ class Config:  # pylint: disable=too-few-public-methods,too-many-instance-attrib
     ORDER_TYPE_MARKET = "market"
     ORDER_TYPE_LIMIT = "limit"
 
+    PRICE_TYPE_ORDERBOOK = "orderbook"
+    PRICE_TYPE_TICKER = "ticker"
+
     def __init__(self):
         # Init config
         config = configparser.ConfigParser()
@@ -22,6 +25,7 @@ class Config:  # pylint: disable=too-few-public-methods,too-many-instance-attrib
             "scout_sleep_time": "5",
             "hourToKeepScoutHistory": "1",
             "tld": "com",
+            "trade_fee": "auto",
             "strategy": "default",
             "sell_timeout": "0",
             "buy_timeout": "0",
@@ -32,6 +36,10 @@ class Config:  # pylint: disable=too-few-public-methods,too-many-instance-attrib
             "update_sell_mul": "4",
             "sell_order_type": self.ORDER_TYPE_MARKET,
             "buy_order_type": self.ORDER_TYPE_LIMIT,
+            "sell_max_price_change": "0.005",
+            "buy_max_price_change": "0.005",
+            "price_type": self.PRICE_TYPE_ORDERBOOK,
+            "max_idle_hours": "3",
         }
 
         if not os.path.exists(CFG_FL_NAME):
@@ -65,6 +73,9 @@ class Config:  # pylint: disable=too-few-public-methods,too-many-instance-attrib
         supported_coin_list = [
             coin.strip() for coin in os.environ.get("SUPPORTED_COIN_LIST", "").split() if coin.strip()
         ]
+
+        self.TRADE_FEE = os.environ.get("TRADE_FEE") or config.get(USER_CFG_SECTION, "trade_fee")
+
         # Get supported coin list from supported_coin_list file
         if not supported_coin_list and os.path.exists("supported_coin_list"):
             with open("supported_coin_list") as rfh:
@@ -104,6 +115,10 @@ class Config:  # pylint: disable=too-few-public-methods,too-many-instance-attrib
             )
         self.SELL_ORDER_TYPE = order_type_map[sell_order_type]
 
+        self.SELL_MAX_PRICE_CHANGE = os.environ.get("SELL_MAX_PRICE_CHANGE") or config.get(
+            USER_CFG_SECTION, "sell_max_price_change"
+        )
+
         buy_order_type = os.environ.get("BUY_ORDER_TYPE") or config.get(
             USER_CFG_SECTION, "buy_order_type", fallback=self.ORDER_TYPE_LIMIT
         )
@@ -118,3 +133,20 @@ class Config:  # pylint: disable=too-few-public-methods,too-many-instance-attrib
                 "comment this line only if you know what you're doing"
             )
         self.BUY_ORDER_TYPE = order_type_map[buy_order_type]
+
+        self.BUY_MAX_PRICE_CHANGE = os.environ.get("BUY_MAX_PRICE_CHANGE") or config.get(
+            USER_CFG_SECTION, "buy_max_price_change"
+        )
+
+        price_types = {self.PRICE_TYPE_ORDERBOOK, self.PRICE_TYPE_TICKER}
+
+        price_type = os.environ.get("PRICE_TYPE") or config.get(
+            USER_CFG_SECTION, "price_type", fallback=self.PRICE_TYPE_ORDERBOOK
+        )
+        if price_type not in price_types:
+            raise Exception(
+                f"{self.PRICE_TYPE_ORDERBOOK} or {self.PRICE_TYPE_TICKER} expected, got {price_type} for price_type"
+            )
+        self.PRICE_TYPE = price_type
+
+        self.MAX_IDLE_HOURS = os.environ.get("MAX_IDLE_HOURS") or config.get(USER_CFG_SECTION, "max_idle_hours")

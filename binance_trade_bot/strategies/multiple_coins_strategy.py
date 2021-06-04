@@ -10,16 +10,9 @@ class Strategy(AutoTrader):
         """
         have_coin = False
 
-        # last coin bought
-        current_coin = self.db.get_current_coin()
-        current_coin_symbol = ""
-
-        if current_coin is not None:
-            current_coin_symbol = current_coin.symbol
-
         for coin in self.db.get_coins():
             current_coin_balance = self.manager.get_currency_balance(coin.symbol)
-            coin_price = self.manager.get_ticker_price(coin + self.config.BRIDGE)
+            coin_price = self.manager.get_sell_price(coin + self.config.BRIDGE)
 
             if coin_price is None:
                 self.logger.info("Skipping scouting... current coin {} not found".format(coin + self.config.BRIDGE))
@@ -27,7 +20,7 @@ class Strategy(AutoTrader):
 
             min_notional = self.manager.get_min_notional(coin.symbol, self.config.BRIDGE.symbol)
 
-            if coin.symbol != current_coin_symbol and coin_price * current_coin_balance < min_notional:
+            if coin_price * current_coin_balance < min_notional:
                 continue
 
             have_coin = True
