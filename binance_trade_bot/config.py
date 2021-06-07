@@ -29,7 +29,6 @@ class Config:  # pylint: disable=too-few-public-methods,too-many-instance-attrib
             "strategy": "default",
             "sell_timeout": "0",
             "buy_timeout": "0",
-            "maximum_loss": "3",
             "first_buy_mul": "1",
             "first_sell_mul": "1",
             "update_buy_mul": "4",
@@ -92,7 +91,6 @@ class Config:  # pylint: disable=too-few-public-methods,too-many-instance-attrib
 
         self.SELL_TIMEOUT = os.environ.get("SELL_TIMEOUT") or config.get(USER_CFG_SECTION, "sell_timeout")
         self.BUY_TIMEOUT = os.environ.get("BUY_TIMEOUT") or config.get(USER_CFG_SECTION, "buy_timeout")
-        self.MAXIMUM_LOSS = float(os.environ.get("MAXIMUM_LOSS") or config.get(USER_CFG_SECTION, "maximum_loss"))
         self.FIRST_BUY_MUL = float(os.environ.get("FIRST_BUY_MUL") or config.get(USER_CFG_SECTION, "first_buy_mul"))
         self.FIRST_SELL_MUL = float(os.environ.get("FIRST_SELL_MUL") or config.get(USER_CFG_SECTION, "first_sell_mul"))
         self.UPDATE_BUY_MUL = float(os.environ.get("UPDATE_BUY_MUL") or config.get(USER_CFG_SECTION, "update_buy_mul"))
