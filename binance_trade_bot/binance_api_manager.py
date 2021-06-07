@@ -242,8 +242,10 @@ class BinanceAPIManager:
         """
         precision = price_decimals(price)
         order = None
-        while order is None:
+        count = 5
+        while order is None and count:
             try:
+                count -= 1
                 order_quantity = (
                     self._sell_quantity(origin_symbol, target_symbol)
                     if float(order_quantity) <= 0.0
@@ -285,10 +287,11 @@ class BinanceAPIManager:
         multiplier = mul if mul else 0.0
         price = round(from_coin_price * (1 + multiplier / 100), precision)
         order_quantity = self._buy_quantity(origin_symbol, target_symbol, target_balance, price)
-
         order = None
-        while order is None:
+        count = 5
+        while order is None and count:
             try:
+                count -= 1
                 order = self.binance_client.create_order(
                     symbol=origin_symbol + target_symbol,
                     quantity=order_quantity,
