@@ -115,6 +115,7 @@ class AutoTrader:
         """
         raise NotImplementedError()
 
+    # pylint: disable=dangerous-default-value
     def _get_ratios(self, coin: Coin, coin_price, excluded_coins: List[Coin] = []):
         """
         Given a coin, get the current price ratio for every other enabled coin
@@ -125,7 +126,7 @@ class AutoTrader:
         scout_logs = []
         excluded_coin_symbols = [c.symbol for c in excluded_coins]
         for pair in self.db.get_pairs_from(coin):
-            #skip excluded coins
+            # skip excluded coins
             if pair.to_coin.symbol in excluded_coin_symbols:
                 continue
 
@@ -153,6 +154,7 @@ class AutoTrader:
         self.db.batch_log_scout(scout_logs)
         return (ratio_dict, prices)
 
+    # pylint: disable=dangerous-default-value
     def _jump_to_best_coin(self, coin: Coin, coin_price: float, excluded_coins: List[Coin] = []):
         """
         Given a coin, search for a coin to jump to
@@ -206,6 +208,13 @@ class AutoTrader:
         cv_batch = []
         for coin in coins:
             balance = self.manager.get_currency_balance(coin.symbol)
+            current_coin = self.db.get_current_coin()
+
+            if coin.symbol == current_coin.symbol:
+                orders = self.manager.get_pair_orders(current_coin.symbol, self.config.BRIDGE_SYMBOL)
+                for order in orders:
+                    balance += order["origQty"]
+
             if balance == 0:
                 continue
             usd_value = self.manager.get_ticker_price(coin + "USDT")
@@ -219,97 +228,86 @@ class AutoTrader:
         Update trading strategy while you are in a coin
         """
 
-        session: Session
-        with self.db.db_session() as session:
-            coins: List[Coin] = session.query(Coin).all()
-            for coin in coins:
-                balance = self.manager.get_currency_balance(coin.symbol)
-                if balance == 0:
-                    continue
-                usd_value = self.manager.get_ticker_price(coin + "USDT")
-                current_coin = self.db.get_current_coin()
+        current_coin = self.db.get_current_coin()
+        balance = self.manager.get_currency_balance(current_coin.symbol)
+        if balance == 0:
+            return
+        usd_value = self.manager.get_ticker_price(current_coin + "USDT")
 
-                if current_coin.symbol == coin.symbol and coin.symbol != self.config.BRIDGE_SYMBOL:
-                    orders = self.manager.get_pair_orders(coin.symbol, self.config.BRIDGE_SYMBOL)
+        if current_coin.symbol != self.config.BRIDGE_SYMBOL:
+            orders = self.manager.get_pair_orders(current_coin.symbol, self.config.BRIDGE_SYMBOL)
 
-                    self.logger.debug(f"Resolving orders {orders} ")
-                    if orders is None:
+            self.logger.debug(f"Resolving orders {orders} ")
+            if orders is None:
+                return
+
+            if isinstance(orders, list) and len(orders) > 0:
+                for order in orders:
+                    if order["side"] == self.manager.binance_client.SIDE_SELL and float(order["stopPrice"]) > usd_value:
+                        self.manager.cancel_order(order["symbol"], order["orderId"])
                         continue
 
-                    if isinstance(orders, list) and len(orders) > 0:
-                        for order in orders:
-                            if (
-                                order["side"] == self.manager.binance_client.SIDE_SELL
-                                and float(order["stopPrice"]) > usd_value
-                            ):
-                                self.manager.cancel_order(order["symbol"], order["orderId"])
-                                continue
+                    if order["side"] == self.manager.binance_client.SIDE_BUY and float(order["stopPrice"]) < usd_value:
+                        self.manager.cancel_order(order["symbol"], order["orderId"])
+                        continue
 
-                            if (
-                                order["side"] == self.manager.binance_client.SIDE_BUY
-                                and float(order["stopPrice"]) < usd_value
-                            ):
-                                self.manager.cancel_order(order["symbol"], order["orderId"])
-                                continue
+                    if (
+                        "stopPrice" in order
+                        and order["side"] == self.manager.binance_client.SIDE_SELL
+                        and float(order["stopPrice"]) > 0.0
+                        and float(order["stopPrice"]) < usd_value * (1 - self.config.UPDATE_SELL_MUL / 100)
+                    ):
+                        self.logger.debug(
+                            f"Updating stop loss sell to " + str(usd_value * (1 - self.config.UPDATE_SELL_MUL / 100))
+                        )
+                        self.manager.cancel_order(order["symbol"], order["orderId"])
+                        self.manager.set_sell_stop_loss_order(
+                            current_coin.symbol,
+                            self.config.BRIDGE_SYMBOL,
+                            usd_value,
+                            float(order["origQty"]),
+                            mul=self.config.UPDATE_SELL_MUL,
+                        )
+                    elif (
+                        "stopPrice" in order
+                        and order["side"] == self.manager.binance_client.SIDE_BUY
+                        and float(order["stopPrice"]) > 0.0
+                        and float(order["stopPrice"]) > usd_value * (1 + self.config.UPDATE_BUY_MUL / 100)
+                    ):
+                        self.logger.debug(
+                            f"Updating stop loss buy to " + str(usd_value * (1 + self.config.UPDATE_BUY_MUL / 100))
+                        )
+                        self.manager.cancel_order(order["symbol"], order["orderId"])
+                        self.manager.set_buy_stop_loss_order(
+                            current_coin.symbol,
+                            self.config.BRIDGE_SYMBOL,
+                            usd_value,
+                            mul=self.config.UPDATE_BUY_MUL,
+                        )
+            else:
+                coin_balance = 0
+                bridge_balance = 0
 
-                            if (
-                                "stopPrice" in order
-                                and order["side"] == self.manager.binance_client.SIDE_SELL
-                                and float(order["stopPrice"]) > 0.0
-                                and float(order["stopPrice"]) < usd_value * (1 - self.config.UPDATE_SELL_MUL / 100)
-                            ):
-                                self.logger.debug(
-                                    f"Updating stop loss sell to "
-                                    + str(usd_value * (1 - self.config.UPDATE_SELL_MUL / 100))
-                                )
-                                self.manager.cancel_order(order["symbol"], order["orderId"])
-                                self.manager.set_sell_stop_loss_order(
-                                    coin.symbol,
-                                    self.config.BRIDGE_SYMBOL,
-                                    usd_value,
-                                    float(order["origQty"]),
-                                    mul=self.config.UPDATE_SELL_MUL,
-                                )
-                            elif (
-                                "stopPrice" in order
-                                and order["side"] == self.manager.binance_client.SIDE_BUY
-                                and float(order["stopPrice"]) > 0.0
-                                and float(order["stopPrice"]) > usd_value * (1 + self.config.UPDATE_BUY_MUL / 100)
-                            ):
-                                self.logger.debug(
-                                    f"Updating stop loss buy to "
-                                    + str(usd_value * (1 + self.config.UPDATE_BUY_MUL / 100))
-                                )
-                                self.manager.cancel_order(order["symbol"], order["orderId"])
-                                self.manager.set_buy_stop_loss_order(
-                                    coin.symbol, self.config.BRIDGE_SYMBOL, usd_value, mul=self.config.UPDATE_BUY_MUL
-                                )
-                    else:
-                        coin_balance = 0
-                        bridge_balance = 0
+                try:
+                    coin_balance = float(self.manager.binance_client.get_asset_balance(current_coin.symbol)["free"])
+                    bridge_balance = float(
+                        self.manager.binance_client.get_asset_balance(self.config.BRIDGE_SYMBOL)["free"]
+                    )
+                except Exception as e:  # pylint: disable=broad-except
+                    self.logger.warning(f"Unexpected Error: {e}")
 
-                        try:
-                            coin_balance = float(self.manager.binance_client.get_asset_balance(coin.symbol)["free"])
-                            bridge_balance = float(
-                                self.manager.binance_client.get_asset_balance(self.config.BRIDGE_SYMBOL)["free"]
-                            )
-                        except Exception as e:  # pylint: disable=broad-except
-                            self.logger.warning(f"Unexpected Error: {e}")
+                if coin_balance * usd_value > 1:
+                    self.logger.info(
+                        f"Set stop loss order to sell at " + str(usd_value * (1 - self.config.FIRST_SELL_MUL / 100))
+                    )
+                    self.manager.set_sell_stop_loss_order(
+                        current_coin.symbol, self.config.BRIDGE_SYMBOL, usd_value, mul=self.config.FIRST_SELL_MUL
+                    )
 
-                        if coin_balance * usd_value > 1:
-                            self.logger.info(
-                                f"Set stop loss order to sell at "
-                                + str(usd_value * (1 - self.config.FIRST_SELL_MUL / 100))
-                            )
-                            self.manager.set_sell_stop_loss_order(
-                                coin.symbol, self.config.BRIDGE_SYMBOL, usd_value, mul=self.config.FIRST_SELL_MUL
-                            )
-
-                        elif bridge_balance > 1:
-                            self.logger.info(
-                                f"Set stop loss order to buy at "
-                                + str(usd_value * (1 + self.config.FIRST_BUY_MUL / 100))
-                            )
-                            self.manager.set_buy_stop_loss_order(
-                                coin.symbol, self.config.BRIDGE_SYMBOL, usd_value, mul=self.config.FIRST_BUY_MUL
-                            )
+                elif bridge_balance > 1:
+                    self.logger.info(
+                        f"Set stop loss order to buy at " + str(usd_value * (1 + self.config.FIRST_BUY_MUL / 100))
+                    )
+                    self.manager.set_buy_stop_loss_order(
+                        current_coin.symbol, self.config.BRIDGE_SYMBOL, usd_value, mul=self.config.FIRST_BUY_MUL
+                    )
