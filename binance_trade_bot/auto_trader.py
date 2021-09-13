@@ -238,6 +238,7 @@ class AutoTrader:
 
         current_coin = self.db.get_current_coin()
         balance = self.manager.get_currency_balance(current_coin.symbol)
+        self.logger.debug(f"Updating existing orders {current_coin} with balance {balance}")
         if balance == 0:
             return
         usd_value = self.manager.get_ticker_price(current_coin + "USDT")
