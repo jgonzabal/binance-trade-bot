@@ -1,6 +1,7 @@
+from binance_trade_bot.models import trade
 import random
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session, aliased
 from sqlalchemy.sql.expression import and_
 
@@ -11,10 +12,16 @@ from binance_trade_bot.database import Pair, Trade, Coin
 
 class Strategy(AutoTrader):
     def initialize(self):
+        self.logger.info(f"CAUTION: The db_reset strategy can lead to losses! A lower idle timeout increases the risk! Use this strategy only if you know what you are doing, did alot of backtests and can live with possible losses.")
+
+        if self.config.ACCEPT_LOSSES != True:
+            self.logger.error("You need accept losses by setting accept_losses=true in the user.cfg or setting the environment variable ACCEPT_LOSSES to true in order to use this strategy!")
+            raise Exception()
+
         super().initialize()
         self.initialize_current_coin()
-        self.reinit_threshold = datetime(1970, 1, 1)
-        self.logger.info(f"CAUTION: The db_reset strategy can lead to losses! A lower idle timeout increases the risk! Use this strategy only if you know what you are doing, did alot of backtests and can live with possible losses.")
+        self.reinit_threshold = datetime(1970, 1, 1, tzinfo=timezone.utc)
+
         self.logger.info(f"Using {self.config.MAX_IDLE_HOURS} hours as maximum idle timeout after not trading.")
 
     def scout(self):
@@ -26,8 +33,9 @@ class Strategy(AutoTrader):
         with self.db.db_session() as session:
             last_trade = session.query(Trade).order_by(Trade.datetime.desc()).first()
             if last_trade != None:
+                last_trade_time = last_trade.datetime.replace(tzinfo=timezone.utc)
                 max_idle_timeout = float(self.config.MAX_IDLE_HOURS)
-                allowed_idle_time = last_trade.datetime + timedelta(hours=max_idle_timeout)
+                allowed_idle_time = last_trade_time + timedelta(hours=max_idle_timeout)
                 base_time: datetime = self.manager.now()
                 if base_time >= allowed_idle_time and base_time >= self.reinit_threshold:
                     self.logger.info(f"Last trade was before {max_idle_timeout} hours! Going to reinit ratios.")
@@ -90,6 +98,16 @@ class Strategy(AutoTrader):
                     current_coin, self.config.BRIDGE, self.manager.get_buy_price(current_coin + self.config.BRIDGE)
                 )
                 self.logger.info("Ready to start trading")
+            else:
+                current_balance = self.manager.get_currency_balance(current_coin_symbol)
+                sell_price = self.manager.get_sell_price(current_coin_symbol + self.config.BRIDGE.symbol)
+                if current_balance is not None and current_balance * sell_price < self.manager.get_min_notional(current_coin_symbol, self.config.BRIDGE.symbol):
+                    self.logger.info(f"Purchasing {current_coin_symbol} to begin trading")
+                    current_coin = self.db.get_current_coin()
+                    self.manager.buy_alt(
+                        current_coin, self.config.BRIDGE, self.manager.get_buy_price(current_coin + self.config.BRIDGE)
+                    )
+                    self.logger.info("Ready to start trading")
 
     def re_initialize_trade_thresholds(self):
         """
@@ -118,7 +136,7 @@ class Strategy(AutoTrader):
                     continue
 
                 to_coin_price = self.manager.get_buy_price(pair.to_coin + self.config.BRIDGE)
-                if to_coin_price is None:
+                if to_coin_price is None or to_coin_price == 0.0:
                     self.logger.info(
                         "Skipping initializing {}, symbol not found".format(pair.to_coin + self.config.BRIDGE),
                         False

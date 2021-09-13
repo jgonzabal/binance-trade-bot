@@ -47,7 +47,7 @@ class AutoTrader:
             self.db.set_current_coin(pair.to_coin)
             price = result.price
             if abs(price) < 1e-15:
-                price = result.cumulative_filled_quantity / result.cumulative_quote_qty
+                price = result.cumulative_quote_qty / result.cumulative_filled_quantity
 
             self.update_trade_threshold(pair.to_coin, price)
             self.failed_buy_order = False
@@ -62,7 +62,7 @@ class AutoTrader:
         Update all the coins with the threshold of buying the current held coin
         """
 
-        if coin_price is None:
+        if coin_price is None or coin_price == 0.0:
             self.logger.info("Skipping update... current coin {} not found".format(coin + self.config.BRIDGE))
             return
 
@@ -101,7 +101,7 @@ class AutoTrader:
                         continue
 
                     to_coin_price = self.manager.get_buy_price(pair.to_coin + self.config.BRIDGE)
-                    if to_coin_price is None:
+                    if to_coin_price is None or to_coin_price == 0.0:
                         self.logger.info(
                             "Skipping initializing {}, symbol not found".format(pair.to_coin + self.config.BRIDGE)
                         )
@@ -133,7 +133,7 @@ class AutoTrader:
             optional_coin_price = self.manager.get_buy_price(pair.to_coin + self.config.BRIDGE)
             prices[pair.to_coin_id] = optional_coin_price
 
-            if optional_coin_price is None:
+            if optional_coin_price is None or optional_coin_price == 0.0:
                 self.logger.info(
                     "Skipping scouting... optional coin {} not found".format(pair.to_coin + self.config.BRIDGE)
                 )
@@ -144,13 +144,21 @@ class AutoTrader:
             # Obtain (current coin)/(optional coin)
             coin_opt_coin_ratio = coin_price / optional_coin_price
 
-            transaction_fee = self.manager.get_fee(pair.from_coin, self.config.BRIDGE, True) + self.manager.get_fee(
-                pair.to_coin, self.config.BRIDGE, False
-            )
+            from_fee = self.manager.get_fee(pair.from_coin, self.config.BRIDGE, True)
+            to_fee = self.manager.get_fee(pair.to_coin, self.config.BRIDGE, False)
 
-            ratio_dict[pair] = (
-                coin_opt_coin_ratio - transaction_fee * self.config.SCOUT_MULTIPLIER * coin_opt_coin_ratio
-            ) - pair.ratio
+            if self.config.RATIO_CALC == self.config.RATIO_CALC_DEFAULT:
+                transaction_fee = from_fee + to_fee
+
+                ratio_dict[pair] = (
+                    coin_opt_coin_ratio - transaction_fee * self.config.SCOUT_MULTIPLIER * coin_opt_coin_ratio
+                ) - pair.ratio
+            if self.config.RATIO_CALC == self.config.RATIO_CALC_SCOUT_MARGIN:
+                transaction_fee = from_fee + to_fee - from_fee * to_fee
+
+                ratio_dict[pair] = (1 - transaction_fee) * coin_opt_coin_ratio / pair.ratio - (
+                    1 + self.config.SCOUT_MULTIPLIER / 100
+                )
         self.db.batch_log_scout(scout_logs)
         return (ratio_dict, prices)
 
@@ -204,7 +212,7 @@ class AutoTrader:
         """
         now = datetime.now()
 
-        coins = self.db.get_coins(False)
+        coins = self.db.get_coins(True)
         cv_batch = []
         for coin in coins:
             balance = self.manager.get_currency_balance(coin.symbol)
@@ -217,7 +225,7 @@ class AutoTrader:
 
             if balance == 0:
                 continue
-            usd_value = self.manager.get_ticker_price(coin + "USDT")
+            usd_value = self.manager.get_ticker_price(coin + self.config.BRIDGE_SYMBOL)
             btc_value = self.manager.get_ticker_price(coin + "BTC")
             cv = CoinValue(coin, balance, usd_value, btc_value, datetime=now)
             cv_batch.append(cv)
@@ -258,7 +266,7 @@ class AutoTrader:
                         and float(order["stopPrice"]) < usd_value * (1 - self.config.UPDATE_SELL_MUL / 100)
                     ):
                         self.logger.debug(
-                            f"Updating stop loss sell to " + str(usd_value * (1 - self.config.UPDATE_SELL_MUL / 100))
+                            "Updating stop loss sell to " + str(usd_value * (1 - self.config.UPDATE_SELL_MUL / 100))
                         )
                         self.manager.cancel_order(order["symbol"], order["orderId"])
                         self.manager.set_sell_stop_loss_order(
@@ -275,7 +283,7 @@ class AutoTrader:
                         and float(order["stopPrice"]) > usd_value * (1 + self.config.UPDATE_BUY_MUL / 100)
                     ):
                         self.logger.debug(
-                            f"Updating stop loss buy to " + str(usd_value * (1 + self.config.UPDATE_BUY_MUL / 100))
+                            "Updating stop loss buy to " + str(usd_value * (1 + self.config.UPDATE_BUY_MUL / 100))
                         )
                         self.manager.cancel_order(order["symbol"], order["orderId"])
                         self.manager.set_buy_stop_loss_order(
@@ -298,7 +306,7 @@ class AutoTrader:
 
                 if coin_balance * usd_value > 1:
                     self.logger.info(
-                        f"Set stop loss order to sell at " + str(usd_value * (1 - self.config.FIRST_SELL_MUL / 100))
+                        "Set stop loss order to sell at " + str(usd_value * (1 - self.config.FIRST_SELL_MUL / 100))
                     )
                     self.manager.set_sell_stop_loss_order(
                         current_coin.symbol, self.config.BRIDGE_SYMBOL, usd_value, mul=self.config.FIRST_SELL_MUL
@@ -306,7 +314,7 @@ class AutoTrader:
 
                 elif bridge_balance > 1:
                     self.logger.info(
-                        f"Set stop loss order to buy at " + str(usd_value * (1 + self.config.FIRST_BUY_MUL / 100))
+                        "Set stop loss order to buy at " + str(usd_value * (1 + self.config.FIRST_BUY_MUL / 100))
                     )
                     self.manager.set_buy_stop_loss_order(
                         current_coin.symbol, self.config.BRIDGE_SYMBOL, usd_value, mul=self.config.FIRST_BUY_MUL

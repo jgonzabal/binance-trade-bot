@@ -1,5 +1,6 @@
 from typing import List
 from re import search
+from binance.client import Client
 
 from sqlalchemy.orm import Session, aliased
 from sqlalchemy.sql.expression import and_
@@ -11,10 +12,6 @@ from .binance_api_manager import BinanceAPIManager
 from .auto_trader import AutoTrader
 from .models.coin import Coin
 from .models.pair import Pair
-
-class WarmUpManager(BinanceAPIManager):
-    def get_all_symbol_tickers(self):
-        return self.binance_client.get_symbol_ticker()
 
 class WarmUpDatabase(Database):
     def __init__(self, logger: Logger, config: Config, uri="sqlite:///data/crypto_trading.db"):
@@ -85,7 +82,7 @@ class WarmUpTrader(AutoTrader):
                     continue
 
                 to_coin_price = self.manager.get_ticker_price(pair.to_coin + self.config.BRIDGE)
-                if to_coin_price is None or to_coin_price == 0:
+                if to_coin_price is None or to_coin_price == 0.0:
                     self.logger.info(
                         "Skipping initializing {}, symbol not found".format(pair.to_coin + self.config.BRIDGE)
                     )
@@ -102,7 +99,7 @@ def warmup_database(coin_list: List[str] = None, db_path = "data/crypto_trading.
 
     config = config or Config()
     db = WarmUpDatabase(logger, config, dbPathUri)
-    manager = WarmUpManager(config, db, logger)
+    manager = BinanceAPIManager.create_manager(config, db, logger)
     # check if we can access API feature that require valid config
     try:
         _ = manager.get_account()
@@ -115,7 +112,7 @@ def warmup_database(coin_list: List[str] = None, db_path = "data/crypto_trading.
     db.create_database()
     logger.info("Done creating database schema")
 
-    warmup_coin_list = coin_list or get_all_bridge_coins(manager, config)
+    warmup_coin_list = coin_list or get_all_bridge_coins(manager.binance_client, config)
     logger.info(f'Going to warm up the following coins: {warmup_coin_list}')
 
     logger.info("Adding coins and pairs to database for warm up")
@@ -129,9 +126,9 @@ def warmup_database(coin_list: List[str] = None, db_path = "data/crypto_trading.
     
     manager.stream_manager.close()
 
-def get_all_bridge_coins(manager: WarmUpManager, config: Config):
+def get_all_bridge_coins(client: Client, config: Config):
     #fetch all tickers
-    all_symbols = manager.get_all_symbol_tickers()
+    all_symbols = client.get_symbol_ticker()
 
     all_bridge_coins: List[str] = []
     for pair in all_symbols:

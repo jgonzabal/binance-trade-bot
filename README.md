@@ -32,12 +32,16 @@ The bot jumps between a configured set of coins on the condition that it does no
 
 ## Binance Setup
 
--   Create a [Binance account](https://www.binance.com/en/register?ref=13222128) (Includes my referral link, I'll be super grateful if you use it).
+-   Create a [Binance account](https://accounts.binance.com/en/register?ref=DDA1SQA) (Includes my referral link, I'll be super grateful if you use it).
 -   Enable Two-factor Authentication.
--   Create a new API key.
+-   Create a new API key and whitelist your IP for it.
 -   Get a cryptocurrency. If its symbol is not in the default list, add it.
 
 ## Tool Setup
+
+### Required Python version
+
+Currently Python 3.7 is the minimum required version.
 
 ### Install Python dependencies
 
@@ -58,13 +62,19 @@ Create a .cfg file named `user.cfg` based off `.user.cfg.example`, then add your
 -   **scout_multiplier** - Controls the value by which the difference between the current state of coin ratios and previous state of ratios is multiplied. For bigger values, the bot will wait for bigger margins to arrive before making a trade.
 -   **trade_fee** - Controls trade fee for calculating profitable jumps. By default it doesn't have value: gets values through the binance api calls. Otherwise use float values for the fee. [Binance fee table for reference](https://www.binance.com/en/fee/schedule)
 -   **strategy** - The trading strategy to use. See [`binance_trade_bot/strategies`](binance_trade_bot/strategies/README.md) for more information
+-   **enable_paper_trading** - (`True` or `False` default `False`) run bot with virtual wallet to check its performance without risking any money.
 -   **buy_timeout/sell_timeout** - Controls how many minutes to wait before cancelling a limit order (buy/sell) and returning to "scout" mode. 0 means that the order will never be cancelled prematurely.
 -   **scout_sleep_time** - Controls how many seconds bot should wait between analysis of current prices. Since the bot now operates on websockets this value should be set to something low (like 1), the reasons to set it above 1 are when you observe high CPU usage by bot or you got api errors about requests weight limit.
 -   **buy_order_type** - Controls the type of placed buy orders, types available: market, limit (default=limit)
 -   **sell_order_type** - Controls the type of placed sell orders, types available: market, limit (default=market)
 -   **buy_max_price_change/sell_max_price_change** - Controls how much price change in decimal percentage is accepted between calculation of ratios and trading.
 -   **price_type** - Controls the type of prices used by the bot, types available: orderbook, ticker (default=orderbook). Please note that using the orderbook prices increase the CPU usage.
-    **max_idle_hours** - Controls the amount of hours for reseting the ratios when the bot has not traded 
+-   **ratio_calc** - Controls the calculation for ratios between coins. Options available: default, scout_margin. Keep in mind you need to decrease your scout_multiplier for the scout_margin. A scout_multiplier of 12 with the default calc would be a scout_multiplier of 2 with the scout_margin calc.
+-   **accept_losses** - Needs to be set to true for highly risky and gamling strategies. Otherwise the bot wont start.
+-   **max_idle_hours** - Controls the amount of hours for reseting the ratios when the bot has not traded (only used in db_reset strategy)
+-   **ratio_adjust_weight** - Controls the weight of the cumulative moving ratio avarage in the ratio_adjust strategy (only used in ratio_adjust strategy)
+-   **auto_adjust_bnb_balance** - Controls the bot to auto buy BNB while there is no enough BNB balance in your account, to get the benifits of using BNB to pay the commisions. Default is false. Effective if you have enabled to [use BNB to pay for any fees on the Binance platform](https://www.binance.com/en/support/faq/115000583311-Using-BNB-to-Pay-for-Fees), reade more information [here](#paying-fees-with-bnb).
+-   **auto_adjust_bnb_balance_rate** - The multiplying power of buying quantity of BNB compares to evaluated comission of the coming order, effective only if auto_adjust_bnb_balance is true. Default value is 3.
 
 #### Environment Variables
 
@@ -84,6 +94,8 @@ BUY_TIMEOUT: 0
 SELL_TIMEOUT: 0
 BUY_ORDER_TYPE: limit
 SELL_ORDER_TYPE: market
+AUTO_ADJUST_BNB_BALANCE: false
+AUTO_ADJUST_BNB_BALANCE_RATE: 3
 ```
 
 ### Paying Fees with BNB
@@ -178,7 +190,13 @@ Thanks to a group of talented developers, there is now a [Telegram bot for remot
 
 ## Support the Project
 
+Fist of all, support the originator of this bot and buy him a coffee. ☕
+
 <a href="https://www.buymeacoffee.com/edeng" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/default-orange.png" alt="Buy Me A Coffee" height="41" width="174"></a>
+
+If you like my adjustments or strategies and you want to support me I would appreciate to get a coffee too. 😜
+
+<a href="https://www.buymeacoffee.com/tntwist" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/default-orange.png" alt="Buy Me A Coffee" height="41" width="174"></a>
 
 ## Join the Chat
 
