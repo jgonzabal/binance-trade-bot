@@ -223,9 +223,8 @@ class AutoTrader:
                 for order in orders:
                     order_qty = float(order["origQty"])
                     balance += order_qty
-                    self.logger.debug(f"Updating balance order Qty {order_qty} with balance {balance-order_qty}")
 
-            if balance == 0:
+            if balance == 0.0:
                 continue
             usd_value = self.manager.get_ticker_price(coin + self.config.BRIDGE_SYMBOL)
             btc_value = self.manager.get_ticker_price(coin + "BTC")
@@ -239,7 +238,7 @@ class AutoTrader:
         """
 
         current_coin = self.db.get_current_coin()
-        balance = self.manager.get_currency_balance(current_coin.symbol)
+        balance = self.manager.get_currency_balance(current_coin.symbol, force=True)
         self.logger.debug(f"Updating existing orders {current_coin} with balance {balance}")
         if balance == 0:
             return
