@@ -33,9 +33,9 @@ class AbstractOrderBalanceManager(ABC):
     def create_order(self, **params):
         pass
 
-    def make_order(self, side: str, symbol: str, quantity: float, price: float, quote_quantity: float):
+    def make_order(self, side: str, coinSymbol: str, quantity: float, price: float, quote_quantity: float):
         params = {
-            "symbol": symbol,
+            "symbol": coinSymbol,
             "side": side,
             "quantity": float_as_decimal_str(quantity),
             "type": Client.ORDER_TYPE_MARKET,
@@ -57,13 +57,13 @@ class BinanceOrderBalanceManager(AbstractOrderBalanceManager):
     def make_order(
         self,
         side: str,
-        symbol: str,
+        coinSymbol: str,
         quantity: float,
         price: float,
         quote_quantity: float,
     ):
         params = {
-            "symbol": symbol,
+            "symbol": coinSymbol,
             "side": side,
             "quantity": float_as_decimal_str(quantity),
             "type": self.config.BUY_ORDER_TYPE if side == Client.SIDE_BUY else self.config.SELL_ORDER_TYPE,
@@ -822,8 +822,8 @@ class PaperOrderBalanceManager(AbstractOrderBalanceManager):
     def create_order(self, **params):
         return {}
 
-    def make_order(self, side: str, symbol: str, quantity: float, price: float, quote_quantity: float):
-        symbol_base = symbol[: -len(self.bridge)]
+    def make_order(self, side: str, coinSymbol: str, quantity: float, price: float, quote_quantity: float):
+        symbol_base = coinSymbol[: -len(self.bridge)]
         if side == Client.SIDE_SELL:
             fees = self.manager.get_fee(Coin(symbol_base), Coin(self.bridge), True)
             self.balances[self.bridge] = self.get_currency_balance(self.bridge) + quote_quantity * (1 - fees)
@@ -833,7 +833,7 @@ class PaperOrderBalanceManager(AbstractOrderBalanceManager):
             self.balances[self.bridge] = self.get_currency_balance(self.bridge) - quote_quantity
             self.balances[symbol_base] = self.get_currency_balance(symbol_base) + quantity * (1 - fees)
         self.cache.balances_changed_event.set()
-        super().make_order(side, symbol, quantity=quantity, quote_quantity=quote_quantity, price=price)
+        super().make_order(side, coinSymbol, quantity=quantity, quote_quantity=quote_quantity, price=price)
         if side == Client.SIDE_BUY:
             # we do it only after buy for transaction speed
             # probably should be a better idea to make it a postponed call
