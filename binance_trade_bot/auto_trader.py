@@ -216,13 +216,6 @@ class AutoTrader:
         cv_batch = []
         for coin in coins:
             balance = self.manager.get_currency_balance(coin.symbol)
-            current_coin = self.db.get_current_coin()
-
-            if coin.symbol == current_coin.symbol:
-                orders = self.manager.get_pair_orders(current_coin.symbol, self.config.BRIDGE_SYMBOL)
-                for order in orders:
-                    order_qty = float(order["origQty"])
-                    balance += order_qty
 
             if balance == 0.0:
                 continue
@@ -238,15 +231,19 @@ class AutoTrader:
         """
 
         current_coin = self.db.get_current_coin()
-        balance = self.manager.get_currency_balance(current_coin.symbol, force=True)
+        balance = self.manager.get_currency_balance(current_coin.symbol)
+
+        orders = self.manager.get_pair_orders(current_coin.symbol, self.config.BRIDGE_SYMBOL)
+        for order in orders:
+            order_qty = float(order["origQty"])
+            balance += order_qty
+
         self.logger.debug(f"Updating existing orders {current_coin} with balance {balance}")
         if balance == 0:
             return
         usd_value = self.manager.get_ticker_price(current_coin + "USDT")
 
         if current_coin.symbol != self.config.BRIDGE_SYMBOL:
-            orders = self.manager.get_pair_orders(current_coin.symbol, self.config.BRIDGE_SYMBOL)
-
             self.logger.debug(f"Resolving orders {orders} ")
             if orders is None:
                 return
