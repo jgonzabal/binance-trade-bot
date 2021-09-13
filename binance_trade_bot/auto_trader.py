@@ -221,7 +221,9 @@ class AutoTrader:
             if coin.symbol == current_coin.symbol:
                 orders = self.manager.get_pair_orders(current_coin.symbol, self.config.BRIDGE_SYMBOL)
                 for order in orders:
-                    balance += float(order["origQty"])
+                    order_qty = float(order["origQty"])
+                    balance += order_qty
+                    self.logger.debug(f"Updating balance order Qty {order_qty} with balance {balance-order_qty}")
 
             if balance == 0:
                 continue
