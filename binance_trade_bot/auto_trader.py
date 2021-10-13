@@ -77,6 +77,12 @@ class AutoTrader:
                     )
                     continue
 
+                # check if we hold above min_notional coins of from_coin. If so skip ratio update.
+                from_coin_balance = self.manager.get_currency_balance(pair.from_coin.symbol)
+                min_notional = self.manager.get_min_notional(pair.from_coin.symbol, self.config.BRIDGE.symbol)
+                if from_coin_price * from_coin_balance > min_notional:
+                    continue
+
                 pair.ratio = from_coin_price / coin_price
 
     def initialize_trade_thresholds(self):
