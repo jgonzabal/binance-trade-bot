@@ -221,6 +221,13 @@ class AutoTrader:
         for coin in coins:
             balance = self.manager.get_currency_balance(coin.symbol)
 
+            current_coin = self.db.get_current_coin()
+
+            if coin.symbol == current_coin.symbol:
+                orders = self.manager.get_pair_orders(current_coin.symbol, self.config.BRIDGE_SYMBOL)
+                for order in orders:
+                    balance += order["origQty"]
+
             if balance == 0.0:
                 continue
             usd_value = self.manager.get_ticker_price(coin + self.config.BRIDGE_SYMBOL)
