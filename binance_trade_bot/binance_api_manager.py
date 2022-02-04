@@ -630,7 +630,10 @@ class BinanceAPIManager:
         # Try to buy until successful
         order = None
         order_guard = self.stream_manager.acquire_order_guard()
+        retries = 5
         while order is None:
+            if retries == 0:
+                return None
             try:
                 order = self.order_balance_manager.make_order(
                     side=Client.SIDE_BUY,
@@ -645,6 +648,8 @@ class BinanceAPIManager:
                 time.sleep(1)
             except Exception as e:  # pylint: disable=broad-except
                 self.logger.warning(f"Unexpected Error: {e}")
+
+            retries -= 1
 
         executed_qty = float(order.get("executedQty", 0))
         if executed_qty > 0 and order["status"] == "FILLED":
