@@ -236,6 +236,32 @@ class AutoTrader:
             cv_batch.append(cv)
         self.db.batch_update_coin_values(cv_batch)
 
+    def update_current_value(self):
+        """
+        Log current value state of all altcoin balances against BTC and USDT in DB.
+        """
+        now = datetime.now()
+
+        coin = current_coin = self.db.get_current_coin()
+        cv_batch = []
+        balance = self.manager.get_currency_balance(coin.symbol)
+
+        current_coin = self.db.get_current_coin()
+
+        if coin.symbol == current_coin.symbol:
+            orders = self.manager.get_pair_orders(current_coin.symbol, self.config.BRIDGE_SYMBOL)
+            for order in orders:
+                balance += float(order["origQty"])
+
+        if balance == 0.0:
+            return
+
+        usd_value = self.manager.get_ticker_price(coin + self.config.BRIDGE_SYMBOL)
+        btc_value = self.manager.get_ticker_price(coin + "BTC")
+        cv = CoinValue(coin, balance, usd_value, btc_value, datetime=now)
+        cv_batch.append(cv)
+        self.db.batch_update_coin_values(cv_batch)
+
     def update_orders(self):
         """
         Update trading strategy while you are in a coin
