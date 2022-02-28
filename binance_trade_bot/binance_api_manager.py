@@ -704,11 +704,12 @@ class BinanceAPIManager:
         orders = self.get_pair_orders(origin_symbol, target_symbol)
         if orders is not None:
             for order in orders:
-                cancel_order = None
-                while cancel_order is None:
-                    cancel_order = self.binance_client.cancel_order(
-                        symbol=origin_symbol + target_symbol, orderId=order["orderId"]
-                    )
+                if "stopPrice" in order:
+                    cancel_order = None
+                    while cancel_order is None:
+                        cancel_order = self.binance_client.cancel_order(
+                            symbol=origin_symbol + target_symbol, orderId=order["orderId"]
+                        )
 
     def cancel_order(self, coinSymbol: str, orderId: str):
         """
