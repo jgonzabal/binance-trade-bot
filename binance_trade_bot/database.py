@@ -160,7 +160,7 @@ class Database:
             market_history = []
             for ccm in current_coin_margins:
                 market_history.append(ccm.value_history)
-            session.expunge(current_coin_margins)
+            session.expunge_all()
             return market_history
 
     def get_pair(self, from_coin: Union[Coin, str], to_coin: Union[Coin, str]):
