@@ -390,7 +390,7 @@ class AutoTrader:
         # if self.config.UPDATE_BUY_MUL != origbuy or self.config.UPDATE_SELL_MUL != origsell:
         #    buy = self.config.UPDATE_BUY_MUL
         #    sell = self.config.UPDATE_SELL_MUL
-        if increasing:
+        if not increasing:
             buy = origbuy + movingStep
             if buy > 4.0:
                 buy = 4.0
