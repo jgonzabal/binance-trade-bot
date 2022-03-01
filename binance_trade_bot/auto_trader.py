@@ -372,7 +372,7 @@ class AutoTrader:
                 current_coin, usd_value, self.config.UPDATE_BUY_MUL, self.config.UPDATE_SELL_MUL
             )
             return
-        if current_coin != margin_coin:
+        if current_coin.symbol != margin_coin:
             self.db.set_current_margins(current_coin, usd_value, buy, sell)
             return
 
