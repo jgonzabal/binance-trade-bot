@@ -11,7 +11,7 @@ class MarketMargins(Base):  # pylint: disable=too-few-public-methods
     __tablename__ = "current_coin_margins"
     id = Column(Integer, primary_key=True)
     coin_id = Column(String, ForeignKey("coins.symbol"))
-    coin = relationship("Coin")
+    coin = relationship("Coin", foreign_keys=[coin_id], lazy="joined")
     value_history = Column(Float)
     buy = Column(Float)
     sell = Column(Float)
