@@ -377,8 +377,12 @@ class AutoTrader:
             return
 
         # Change values based on trend
-        buy = origbuy
-        sell = origsell
+        if self.config.UPDATE_BUY_MUL != origbuy or self.config.UPDATE_SELL_MUL != origsell:
+            buy = self.config.UPDATE_BUY_MUL
+            sell = self.config.UPDATE_SELL_MUL
+        else:
+            buy = origbuy
+            sell = origsell
 
         if origbuy != buy or origsell != sell:
             self.logger.info(
