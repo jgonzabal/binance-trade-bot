@@ -231,6 +231,12 @@ class Database:
         with self.db_session() as session:
             session.query(ScoutHistory).filter(ScoutHistory.datetime < time_diff).delete()
 
+    def prune_market_history(self):
+        time_diff = datetime.now() - timedelta(hours=24 * self.config.SCOUT_HISTORY_PRUNE_TIME)
+        session: Session
+        with self.db_session() as session:
+            session.query(MarketMargins).filter(MarketMargins.datetime < time_diff).delete()
+
     def prune_value_history(self):
         session: Session
         with self.db_session() as session:

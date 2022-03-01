@@ -391,9 +391,9 @@ class AutoTrader:
                 + "\n USD value: "
                 + str(usd_value)
                 + " to buy: "
-                + str(origbuy)
+                + str(buy)
                 + "%, sell: "
-                + str(origsell)
+                + str(sell)
                 + "%\n last10vals: "
                 + str(history)
             )
