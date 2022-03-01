@@ -4,16 +4,17 @@ import time
 from collections import namedtuple
 from contextlib import contextmanager
 from datetime import datetime, timedelta
+from multiprocessing.dummy import Array
 from typing import List, Optional, Union
 
 from socketio import Client
 from socketio.exceptions import ConnectionError as SocketIOConnectionError
-from sqlalchemy import create_engine, func, insert, select, update
+from sqlalchemy import create_engine, insert
 from sqlalchemy.orm import Session, scoped_session, sessionmaker
 
 from .config import Config
 from .logger import Logger
-from .models import *  # pylint: disable=wildcard-import
+from .models import *  # pylint: disable=wildcard-import,unused-wildcard-import
 
 LogScout = namedtuple("LogScout", ["pair", "target_ratio", "coin_price", "optional_coin_price"])
 
@@ -25,10 +26,11 @@ class Database:
         self.engine = create_engine(uri)
         self.session_factory = scoped_session(sessionmaker(bind=self.engine))
         self.socketio_client = Client()
-        self.isTest=isTest
+        self.isTest = isTest
 
     def socketio_connect(self):
-        if self.isTest:    return False
+        if self.isTest:
+            return False
         if self.socketio_client.connected and self.socketio_client.namespaces:
             return True
         try:
@@ -120,6 +122,35 @@ class Database:
             session.expunge(coin)
             return coin
 
+    def set_current_margins(self, coin: Union[Coin, str], value: float, buy: float, sell: float):
+        coin = self.get_coin(coin)
+        session: Session
+        with self.db_session() as session:
+            if isinstance(coin, Coin):
+                coin = session.merge(coin)
+
+            current_coin_margins = session.query(MarketMargins).order_by(MarketMargins.datetime.desc()).first()
+            current_coin_margins.value_history.append(value)
+            mm = MarketMargins(coin)
+            mm.sell = sell
+            mm.buy = buy
+            mm.value_history = current_coin_margins[-100:]
+            session.add(mm)
+            self.send_update(mm)
+
+    def get_current_margins(self) -> Union[Coin, float, float, Array[float]]:
+        session: Session
+        with self.db_session() as session:
+            current_coin_margins = session.query(MarketMargins).order_by(MarketMargins.datetime.desc()).first()
+            if current_coin_margins is None:
+                return [None, None, None]
+            coin = current_coin_margins.coin
+            buy = current_coin_margins.buy
+            sell = current_coin_margins.sell
+            history = current_coin_margins.value_history
+            session.expunge(coin)
+            return [coin, buy, sell, history]
+
     def get_pair(self, from_coin: Union[Coin, str], to_coin: Union[Coin, str]):
         from_coin = self.get_coin(from_coin)
         to_coin = self.get_coin(to_coin)
@@ -192,7 +223,7 @@ class Database:
         session: Session
         with self.db_session() as session:
             session.query(CoinValue).delete()
-            
+
     def create_database(self):
         Base.metadata.create_all(self.engine)
 

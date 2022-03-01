@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from .config import Config
 from .database import Database
 from .logger import Logger
-from .models import Coin, CoinValue, CurrentCoin, Pair, ScoutHistory, Trade
+from .models import Coin, CoinValue, CurrentCoin, MarketMargins, Pair, ScoutHistory, Trade
 
 app = Flask(__name__)
 cors = CORS(app, resources={r"/api/*": {"origins": "*"}})
@@ -124,6 +124,18 @@ def current_coin_history():
         query = filter_period(query, CurrentCoin)
 
         current_coins: List[CurrentCoin] = query.all()
+        return jsonify([cc.info() for cc in current_coins])
+
+
+@app.route("/api/current_coin_margins")
+def current_coin_margins():
+    session: Session
+    with db.db_session() as session:
+        query = session.query(MarketMargins)
+
+        query = filter_period(query, MarketMargins)
+
+        current_coins: List[MarketMargins] = query.all()
         return jsonify([cc.info() for cc in current_coins])
 
 

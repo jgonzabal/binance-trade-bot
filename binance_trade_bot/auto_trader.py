@@ -295,15 +295,18 @@ class AutoTrader:
                         self.manager.cancel_order(order["symbol"], order["orderId"])
                         continue
 
+                    margin_coin, update_buy_mul, update_sell_mul = self.db.get_current_margins()
+                    if margin_coin != current_coin or update_buy_mul is None or update_sell_mul is None:
+                        update_buy_mul = self.config.UPDATE_BUY_MUL
+                        update_sell_mul = self.config.UPDATE_SELL_MUL
+
                     if (
                         "stopPrice" in order
                         and order["side"] == self.manager.binance_client.SIDE_SELL
                         and float(order["stopPrice"]) > 0.0
-                        and float(order["stopPrice"]) < usd_value * (1 - self.config.UPDATE_SELL_MUL / 100)
+                        and float(order["stopPrice"]) < usd_value * (1 - update_sell_mul / 100)
                     ):
-                        self.logger.debug(
-                            "Updating stop loss sell to " + str(usd_value * (1 - self.config.UPDATE_SELL_MUL / 100))
-                        )
+                        self.logger.debug("Updating stop loss sell to " + str(usd_value * (1 - update_sell_mul / 100)))
                         self.manager.cancel_order(order["symbol"], order["orderId"])
                         self.manager.set_sell_stop_loss_order(
                             current_coin.symbol,
@@ -316,11 +319,9 @@ class AutoTrader:
                         "stopPrice" in order
                         and order["side"] == self.manager.binance_client.SIDE_BUY
                         and float(order["stopPrice"]) > 0.0
-                        and float(order["stopPrice"]) > usd_value * (1 + self.config.UPDATE_BUY_MUL / 100)
+                        and float(order["stopPrice"]) > usd_value * (1 + update_buy_mul / 100)
                     ):
-                        self.logger.debug(
-                            "Updating stop loss buy to " + str(usd_value * (1 + self.config.UPDATE_BUY_MUL / 100))
-                        )
+                        self.logger.debug("Updating stop loss buy to " + str(usd_value * (1 + update_buy_mul / 100)))
                         self.manager.cancel_order(order["symbol"], order["orderId"])
                         self.manager.set_buy_stop_loss_order(
                             current_coin.symbol,
@@ -355,3 +356,26 @@ class AutoTrader:
                     self.manager.set_buy_stop_loss_order(
                         current_coin.symbol, self.config.BRIDGE_SYMBOL, usd_value, mul=self.config.FIRST_BUY_MUL
                     )
+
+    def update_trend_margins(self):
+        """
+        Log current value state of all altcoin balances against BTC and USDT in DB.
+        """
+
+        current_coin = self.db.get_current_coin()
+        margin_coin, buy, sell, history = self.db.get_current_margins()
+        usd_value = self.manager.get_ticker_price(current_coin + self.config.BRIDGE_SYMBOL)
+
+        if margin_coin is None:
+            self.db.set_current_margins(
+                current_coin, usd_value, self.config.UPDATE_BUY_MUL, self.config.UPDATE_SELL_MUL
+            )
+            return
+        if current_coin != margin_coin:
+            self.db.set_current_margins(current_coin, usd_value, buy, sell)
+            return
+
+        self.db.set_current_margins(current_coin, usd_value, buy, sell)
+        self.logger.info(
+            "Set current margins to buy: " + str(buy) + ", sell: " + str(sell) + ", last10vals: " + str(history[-10:])
+        )
