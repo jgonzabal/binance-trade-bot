@@ -364,6 +364,7 @@ class AutoTrader:
 
         current_coin = self.db.get_current_coin()
         margin_coin, buy, sell, history = self.db.get_current_margins()
+        history = self.db.get_current_history(margin_coin)
         usd_value = self.manager.get_ticker_price(current_coin + self.config.BRIDGE_SYMBOL)
 
         if margin_coin is None:
@@ -377,5 +378,5 @@ class AutoTrader:
 
         self.db.set_current_margins(current_coin, usd_value, buy, sell)
         self.logger.info(
-            "Set current margins to buy: " + str(buy) + ", sell: " + str(sell) + ", last10vals: " + str(history[-10:])
+            "Set current margins to buy: " + str(buy) + ", sell: " + str(sell) + ", last10vals: " + str(history)
         )

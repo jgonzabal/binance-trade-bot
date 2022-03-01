@@ -129,16 +129,14 @@ class Database:
             if isinstance(coin, Coin):
                 coin = session.merge(coin)
 
-            current_coin_margins = session.query(MarketMargins).order_by(MarketMargins.datetime.desc()).first()
-            current_coin_margins.value_history.append(value)
             mm = MarketMargins(coin)
             mm.sell = sell
             mm.buy = buy
-            mm.value_history = current_coin_margins[-100:]
+            mm.value_history = value
             session.add(mm)
             self.send_update(mm)
 
-    def get_current_margins(self) -> Union[Coin, float, float, Array]:
+    def get_current_margins(self) -> Union[Coin, float, float, float]:
         session: Session
         with self.db_session() as session:
             current_coin_margins = session.query(MarketMargins).order_by(MarketMargins.datetime.desc()).first()
@@ -147,9 +145,23 @@ class Database:
             coin = current_coin_margins.coin
             buy = current_coin_margins.buy
             sell = current_coin_margins.sell
-            history = current_coin_margins.value_history
-            session.expunge(coin)
-            return [coin, buy, sell, history]
+            value = current_coin_margins.value_history
+            session.expunge(current_coin_margins)
+            return [coin, buy, sell, value]
+
+    def get_current_history(self, coin: Union[Coin, str]) -> Array:
+        session: Session
+        with self.db_session() as session:
+            current_coin_margins = (
+                session.query(MarketMargins)
+                .filter(MarketMargins.coin == coin)
+                .order_by(MarketMargins.datetime.desc())[:100]
+            )
+            market_history = []
+            for ccm in current_coin_margins:
+                market_history.append(ccm.value_history)
+            session.expunge(current_coin_margins)
+            return market_history
 
     def get_pair(self, from_coin: Union[Coin, str], to_coin: Union[Coin, str]):
         from_coin = self.get_coin(from_coin)
