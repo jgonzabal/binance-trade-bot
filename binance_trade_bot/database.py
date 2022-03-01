@@ -153,7 +153,7 @@ class Database:
         with self.db_session() as session:
             current_coin_margins = (
                 session.query(MarketMargins)
-                .filter(MarketMargins.coin == coin)
+                .filter(MarketMargins.coin == coin.symbol)
                 .order_by(MarketMargins.datetime.desc())
                 .limit(100)
             )
