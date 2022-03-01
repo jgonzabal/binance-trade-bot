@@ -387,7 +387,7 @@ class AutoTrader:
         if origbuy != buy or origsell != sell:
             self.logger.info(
                 "Set current margins for "
-                + current_coin
+                + current_coin.symbol
                 + "\n USD value: "
                 + str(usd_value)
                 + " to buy: "
