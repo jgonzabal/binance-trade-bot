@@ -2,6 +2,7 @@ from collections import defaultdict
 from datetime import datetime
 from typing import Dict, List
 
+import numpy as np
 from sqlalchemy.orm import Session
 
 from .binance_api_manager import BinanceAPIManager
@@ -9,6 +10,12 @@ from .config import Config
 from .database import Database, LogScout
 from .logger import Logger
 from .models import Coin, CoinValue, Pair
+
+
+def moving_average(a, n=3):
+    ret = np.cumsum(a, dtype=float)
+    ret[n:] = ret[n:] - ret[:-n]
+    return ret[n - 1 :] / n
 
 
 class AutoTrader:
@@ -377,12 +384,26 @@ class AutoTrader:
             return
 
         # Change values based on trend
-        if self.config.UPDATE_BUY_MUL != origbuy or self.config.UPDATE_SELL_MUL != origsell:
-            buy = self.config.UPDATE_BUY_MUL
-            sell = self.config.UPDATE_SELL_MUL
+        movingStep = 0.1
+        increasing = np.all(np.diff(moving_average(np.array(history), n=4)) > 0)
+
+        # if self.config.UPDATE_BUY_MUL != origbuy or self.config.UPDATE_SELL_MUL != origsell:
+        #    buy = self.config.UPDATE_BUY_MUL
+        #    sell = self.config.UPDATE_SELL_MUL
+        if increasing:
+            buy = origbuy + movingStep
+            if buy > 4.0:
+                buy = 4.0
+            sell = origsell - movingStep
+            if sell < 1.0:
+                sell = 1.0
         else:
-            buy = origbuy
-            sell = origsell
+            buy = origbuy - movingStep
+            if buy < 1.0:
+                buy = 1.0
+            sell = origsell + movingStep
+            if sell > 4.0:
+                sell = 4.0
 
         if origbuy != buy or origsell != sell:
             self.logger.info(
