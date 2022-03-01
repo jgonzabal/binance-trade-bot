@@ -142,18 +142,18 @@ class Database:
             current_coin_margins = session.query(MarketMargins).order_by(MarketMargins.datetime.desc()).first()
             if current_coin_margins is None:
                 return [None, None, None]
-            coin = current_coin_margins.coin
+            coin = current_coin_margins.coin_symbol
             buy = current_coin_margins.buy
             sell = current_coin_margins.sell
             session.expunge(current_coin_margins)
             return [coin, buy, sell]
 
-    def get_current_history(self, coin: Union[Coin, str]) -> Array:
+    def get_current_history(self, coin: str) -> Array:
         session: Session
         with self.db_session() as session:
             current_coin_margins = (
                 session.query(MarketMargins)
-                .filter(MarketMargins.coin == coin)
+                .filter(MarketMargins.coin_symbol == coin)
                 .order_by(MarketMargins.datetime.desc())
                 .limit(100)
             )
