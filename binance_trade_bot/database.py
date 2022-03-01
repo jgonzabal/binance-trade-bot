@@ -138,7 +138,7 @@ class Database:
             session.add(mm)
             self.send_update(mm)
 
-    def get_current_margins(self) -> Union[Coin, float, float, Array[float]]:
+    def get_current_margins(self) -> Union[Coin, float, float, Array]:
         session: Session
         with self.db_session() as session:
             current_coin_margins = session.query(MarketMargins).order_by(MarketMargins.datetime.desc()).first()
