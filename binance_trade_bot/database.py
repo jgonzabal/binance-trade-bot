@@ -136,7 +136,7 @@ class Database:
             session.add(mm)
             self.send_update(mm)
 
-    def get_current_margins(self) -> Union[Coin, float, float, float]:
+    def get_current_margins(self) -> Union[Coin, float, float]:
         session: Session
         with self.db_session() as session:
             current_coin_margins = session.query(MarketMargins).order_by(MarketMargins.datetime.desc()).first()
@@ -145,8 +145,7 @@ class Database:
             coin = current_coin_margins.coin
             buy = current_coin_margins.buy
             sell = current_coin_margins.sell
-            value = current_coin_margins.value_history
-            return [coin, buy, sell, value]
+            return [coin, buy, sell]
 
     def get_current_history(self, coin: Union[Coin, str]) -> Array:
         session: Session
