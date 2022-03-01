@@ -363,7 +363,7 @@ class AutoTrader:
         """
 
         current_coin = self.db.get_current_coin()
-        margin_coin, buy, sell, history = self.db.get_current_margins()
+        margin_coin, buy, sell = self.db.get_current_margins()
         history = self.db.get_current_history(margin_coin)
         usd_value = self.manager.get_ticker_price(current_coin + self.config.BRIDGE_SYMBOL)
 
