@@ -145,6 +145,7 @@ class Database:
             coin = current_coin_margins.coin
             buy = current_coin_margins.buy
             sell = current_coin_margins.sell
+            session.expunge(current_coin_margins)
             return [coin, buy, sell]
 
     def get_current_history(self, coin: Union[Coin, str]) -> Array:
@@ -153,11 +154,13 @@ class Database:
             current_coin_margins = (
                 session.query(MarketMargins)
                 .filter(MarketMargins.coin == coin)
-                .order_by(MarketMargins.datetime.desc())[:100]
+                .order_by(MarketMargins.datetime.desc())
+                .limit(100)
             )
             market_history = []
             for ccm in current_coin_margins:
                 market_history.append(ccm.value_history)
+            session.expunge(current_coin_margins)
             return market_history
 
     def get_pair(self, from_coin: Union[Coin, str], to_coin: Union[Coin, str]):
