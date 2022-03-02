@@ -385,7 +385,7 @@ class AutoTrader:
 
         # Change values based on trend
         movingStep = 0.1
-        increasing = np.all(np.diff(moving_average(np.array(history), n=4)) > 0)
+        increasing = np.all(np.diff(moving_average(np.array(history), n=50)) > 0)
 
         # if self.config.UPDATE_BUY_MUL != origbuy or self.config.UPDATE_SELL_MUL != origsell:
         #    buy = self.config.UPDATE_BUY_MUL
