@@ -159,7 +159,7 @@ class Database:
             )
             market_history = []
             for ccm in current_coin_margins:
-                market_history.append(ccm.value_history)
+                market_history.insert(0, ccm.value_history)
             session.expunge_all()
             return market_history
 

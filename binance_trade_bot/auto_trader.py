@@ -390,33 +390,34 @@ class AutoTrader:
         # if self.config.UPDATE_BUY_MUL != origbuy or self.config.UPDATE_SELL_MUL != origsell:
         #    buy = self.config.UPDATE_BUY_MUL
         #    sell = self.config.UPDATE_SELL_MUL
-        if increasing:
+        if not increasing:
             buy = origbuy + movingStep
-            if buy > 4.0:
-                buy = 4.0
+            if buy > 4.5:
+                buy = 4.5
             sell = origsell - movingStep
-            if sell < 1.0:
-                sell = 1.0
+            if sell < 0.5:
+                sell = 0.5
         else:
             buy = origbuy - movingStep
-            if buy < 1.0:
-                buy = 1.0
+            if buy < 0.5:
+                buy = 0.5
             sell = origsell + movingStep
-            if sell > 4.0:
-                sell = 4.0
+            if sell > 4.5:
+                sell = 4.5
 
-        if origbuy != buy or origsell != sell:
-            self.logger.info(
-                "Set current margins for "
-                + current_coin.symbol
-                + "\n USD value: "
-                + str(usd_value)
-                + " to buy: "
-                + str(buy)
-                + "%, sell: "
-                + str(sell)
-                + "%\n last10vals: "
-                + str(history)
-            )
+        # if origbuy != buy or origsell != sell:
+        self.logger.info(
+            "Set current margins for "
+            + current_coin.symbol
+            + "\n $"
+            + str(usd_value)
+            + (" goes up." if increasing else " goes down.")
+            + " Buy: "
+            + str(buy)
+            + "%, Sell: "
+            + str(sell)
+            + "%\n last10vals: "
+            + str(history)
+        )
 
         self.db.set_current_margins(current_coin, usd_value, buy, sell)

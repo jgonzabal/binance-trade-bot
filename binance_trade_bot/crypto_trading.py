@@ -66,7 +66,7 @@ def main():
     schedule.every(15).seconds.do(trader.update_values).tag("updating value history")
     schedule.every(2).seconds.do(trader.update_current_value).tag("updating current value history")
     schedule.every(5).seconds.do(trader.update_orders).tag("updating orders")
-    schedule.every(5).seconds.do(trader.update_trend_margins).tag("updating trend margins")
+    schedule.every(10).seconds.do(trader.update_trend_margins).tag("updating trend margins")
     schedule.every(1).minutes.do(db.prune_scout_history).tag("pruning scout history")
     schedule.every(1).hours.do(db.prune_value_history).tag("pruning value history")
     try:
