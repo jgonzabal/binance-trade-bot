@@ -405,19 +405,19 @@ class AutoTrader:
             if sell > 4.5:
                 sell = 4.5
 
-        # if origbuy != buy or origsell != sell:
-        self.logger.info(
-            "Set current margins for "
-            + current_coin.symbol
-            + "\n $"
-            + str(usd_value)
-            + (" goes up." if increasing else " goes down.")
-            + " Buy: "
-            + str(buy)
-            + "%, Sell: "
-            + str(sell)
-            + "%\n last10vals: "
-            + str(history)
-        )
+        if origbuy != buy or origsell != sell:
+            self.logger.info(
+                "Set current margins for "
+                + current_coin.symbol
+                + "\n $"
+                + str(usd_value)
+                + (" goes up." if increasing else " goes down.")
+                + " Buy: "
+                + str(buy)
+                + "%, Sell: "
+                + str(sell)
+                + "%\n last10vals: "
+                + str(history)
+            )
 
         self.db.set_current_margins(current_coin, usd_value, buy, sell)
