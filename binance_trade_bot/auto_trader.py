@@ -402,7 +402,7 @@ class AutoTrader:
 
         # Change values based on trend
         movingStep = 0.1
-        increasing = np.all(np.diff(moving_average(np.array(history), n=50)) > 0)
+        # increasing = np.all(np.diff(moving_average(np.array(history), n=50)) > 0)
 
         a, b = linreg(range(len(history)), history)
         extrapolatedtrendline = [a * index + b for index in range(1)]
@@ -432,7 +432,7 @@ class AutoTrader:
                 + current_coin.symbol
                 + "\n $"
                 + str(usd_value)
-                + (" goes up." if increasing else " goes down.")
+                + (" goes up." if extrapolatedtrendline[0] > usd_value else " goes down.")
                 + " Expected value $"
                 + str(extrapolatedtrendline[0])
                 + "\n Buy: "
