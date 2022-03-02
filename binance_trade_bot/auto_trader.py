@@ -426,7 +426,7 @@ class AutoTrader:
             if sell > 4.5:
                 sell = 4.5
 
-        if origbuy != buy or origsell != sell:
+        if abs(usd_value - extrapolatedtrendline[0]) > usd_value * 0.02:
             self.logger.info(
                 "Set current margins for "
                 + current_coin.symbol
