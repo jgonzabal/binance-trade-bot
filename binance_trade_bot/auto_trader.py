@@ -18,6 +18,23 @@ def moving_average(a, n=3):
     return ret[n - 1 :] / n
 
 
+def linreg(X, Y):
+    """
+    return a,b in solution to y = ax + b such that root mean square
+    distance between trend line and original points is minimized
+    """
+    N = len(X)
+    Sx = Sy = Sxx = Syy = Sxy = 0.0
+    for x, y in zip(X, Y):
+        Sx = Sx + x
+        Sy = Sy + y
+        Sxx = Sxx + x * x
+        Syy = Syy + y * y
+        Sxy = Sxy + x * y
+    det = Sxx * N - Sx * Sx
+    return (Sxy * N - Sy * Sx) / det, (Sxx * Sy - Sx * Sxy) / det
+
+
 class AutoTrader:
     def __init__(self, binance_manager: BinanceAPIManager, database: Database, logger: Logger, config: Config):
         self.manager = binance_manager
@@ -387,10 +404,14 @@ class AutoTrader:
         movingStep = 0.1
         increasing = np.all(np.diff(moving_average(np.array(history), n=50)) > 0)
 
+        a, b = linreg(range(len(history)), history)
+        extrapolatedtrendline = [a * index + b for index in range(1)]
+
         # if self.config.UPDATE_BUY_MUL != origbuy or self.config.UPDATE_SELL_MUL != origsell:
         #    buy = self.config.UPDATE_BUY_MUL
         #    sell = self.config.UPDATE_SELL_MUL
-        if not increasing:
+        # if not increasing:
+        if extrapolatedtrendline[0] <= usd_value:
             buy = origbuy + movingStep
             if buy > 4.5:
                 buy = 4.5
@@ -412,7 +433,9 @@ class AutoTrader:
                 + "\n $"
                 + str(usd_value)
                 + (" goes up." if increasing else " goes down.")
-                + " Buy: "
+                + " Expected value $"
+                + str(extrapolatedtrendline[0])
+                + "\n Buy: "
                 + str(buy)
                 + "%, Sell: "
                 + str(sell)
