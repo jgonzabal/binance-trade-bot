@@ -381,11 +381,12 @@ class AutoTrader:
         # Change values based on trend
         movingStep = 0.1
         # increasing = np.all(np.diff(moving_average(np.array(history), n=50)) > 0)
-        xarray = [i for i in range(len(history))]
+        len_history = len(history)
+        xarray = list(range(len_history))
         x = np.array(xarray).reshape((-1, 1))
         y = np.array(history).reshape((-1, 1))
         model = LinearRegression().fit(x, y)
-        y_pred = model.predict([len(history)])
+        y_pred = model.predict(np.array([len_history]).reshape((-1, 1)))
 
         # if self.config.UPDATE_BUY_MUL != origbuy or self.config.UPDATE_SELL_MUL != origsell:
         #    buy = self.config.UPDATE_BUY_MUL
