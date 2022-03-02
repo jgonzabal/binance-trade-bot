@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import Dict, List
 
 import numpy as np
+from sklearn.linear_model import LinearRegression
 from sqlalchemy.orm import Session
 
 from .binance_api_manager import BinanceAPIManager
@@ -10,29 +11,6 @@ from .config import Config
 from .database import Database, LogScout
 from .logger import Logger
 from .models import Coin, CoinValue, Pair
-
-
-def moving_average(a, n=3):
-    ret = np.cumsum(a, dtype=float)
-    ret[n:] = ret[n:] - ret[:-n]
-    return ret[n - 1 :] / n
-
-
-def linreg(X, Y):
-    """
-    return a,b in solution to y = ax + b such that root mean square
-    distance between trend line and original points is minimized
-    """
-    N = len(X)
-    Sx = Sy = Sxx = Syy = Sxy = 0.0
-    for x, y in zip(X, Y):
-        Sx = Sx + x
-        Sy = Sy + y
-        Sxx = Sxx + x * x
-        Syy = Syy + y * y
-        Sxy = Sxy + x * y
-    det = Sxx * N - Sx * Sx
-    return (Sxy * N - Sy * Sx) / det, (Sxx * Sy - Sx * Sxy) / det
 
 
 class AutoTrader:
@@ -403,15 +381,17 @@ class AutoTrader:
         # Change values based on trend
         movingStep = 0.1
         # increasing = np.all(np.diff(moving_average(np.array(history), n=50)) > 0)
-
-        a, b = linreg(range(len(history)), history)
-        extrapolatedtrendline = [a * index + b for index in range(1)]
+        xarray = [i for i in range(len(history))]
+        x = np.array(xarray).reshape((-1, 1))
+        y = np.array(history).reshape((-1, 1))
+        model = LinearRegression().fit(x, y)
+        y_pred = model.predict([len(history)])
 
         # if self.config.UPDATE_BUY_MUL != origbuy or self.config.UPDATE_SELL_MUL != origsell:
         #    buy = self.config.UPDATE_BUY_MUL
         #    sell = self.config.UPDATE_SELL_MUL
         # if not increasing:
-        if extrapolatedtrendline[0] <= usd_value:
+        if y_pred[0] <= usd_value:
             buy = origbuy + movingStep
             if buy > 4.5:
                 buy = 4.5
@@ -426,15 +406,15 @@ class AutoTrader:
             if sell > 4.5:
                 sell = 4.5
 
-        if abs(usd_value - extrapolatedtrendline[0]) > usd_value * 0.02:
+        if abs(usd_value - y_pred[0]) > usd_value * 0.02:
             self.logger.info(
                 "Set current margins for "
                 + current_coin.symbol
                 + "\n $"
                 + str(usd_value)
-                + (" goes up." if extrapolatedtrendline[0] > usd_value else " goes down.")
+                + (" goes up." if y_pred[0] > usd_value else " goes down.")
                 + " Expected value $"
-                + str(extrapolatedtrendline[0])
+                + str(y_pred[0])
                 + "\n Buy: "
                 + str(buy)
                 + "%, Sell: "

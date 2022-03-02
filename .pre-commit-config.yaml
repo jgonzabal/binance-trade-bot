@@ -76,6 +76,7 @@ repos:
     - python-binance==1.0.15
     - python-socketio[client]==5.2.1
     - schedule==1.1.0
+    - scikit-learn==1.0.2
     - sqlalchemy==1.4.25
     - sqlitedict==1.7.0
     - unicorn-binance-websocket-api==1.33.1
