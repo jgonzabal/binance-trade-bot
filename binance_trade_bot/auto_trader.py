@@ -392,7 +392,7 @@ class AutoTrader:
         #    buy = self.config.UPDATE_BUY_MUL
         #    sell = self.config.UPDATE_SELL_MUL
         # if not increasing:
-        if y_pred[0] <= usd_value:
+        if model.coef_[0][0] < 0:
             buy = origbuy + movingStep
             if buy > 4.0:
                 buy = 4.0
