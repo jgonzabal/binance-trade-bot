@@ -423,5 +423,21 @@ class AutoTrader:
                 + "%\n last10vals: "
                 + str(history)
             )
+        else:
+            self.logger.debug(
+                "Set current margins for "
+                + current_coin.symbol
+                + "\n $"
+                + str(usd_value)
+                + (" goes up." if y_pred[0] > usd_value else " goes down.")
+                + " Expected value $"
+                + str(y_pred[0])
+                + "\n Buy: "
+                + str(buy)
+                + "%, Sell: "
+                + str(sell)
+                + "%\n last10vals: "
+                + str(history)
+            )
 
         self.db.set_current_margins(current_coin, usd_value, buy, sell)
