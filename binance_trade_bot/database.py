@@ -155,7 +155,7 @@ class Database:
                 session.query(MarketMargins)
                 .filter(MarketMargins.coin_symbol == coin)
                 .order_by(MarketMargins.datetime.desc())
-                .limit(100)
+                .limit(500)
             )
             market_history = []
             for ccm in current_coin_margins:

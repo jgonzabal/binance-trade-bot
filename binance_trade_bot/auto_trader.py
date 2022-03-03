@@ -394,34 +394,34 @@ class AutoTrader:
         # if not increasing:
         if y_pred[0] <= usd_value:
             buy = origbuy + movingStep
-            if buy > 4.5:
-                buy = 4.5
+            if buy > 4.0:
+                buy = 4.0
             sell = origsell - movingStep
-            if sell < 0.5:
-                sell = 0.5
+            if sell < 1.0:
+                sell = 1.0
         else:
             buy = origbuy - movingStep
-            if buy < 0.5:
-                buy = 0.5
+            if buy < 1.0:
+                buy = 1.0
             sell = origsell + movingStep
-            if sell > 4.5:
-                sell = 4.5
+            if sell > 4.0:
+                sell = 4.0
 
-        #if abs(usd_value - y_pred[0]) > usd_value * 0.02:
-        self.logger.info(
-            "Set current margins for "
-            + current_coin.symbol
-            + "\n $"
-            + str(usd_value)
-            + (" goes up." if y_pred[0] > usd_value else " goes down.")
-            + " Expected value $"
-            + str(y_pred[0])
-            + "\n Buy: "
-            + str(buy)
-            + "%, Sell: "
-            + str(sell)
-            + "%\n last10vals: "
-            + str(history)
-        )
+        if buy != origbuy or sell != origsell:
+            self.logger.info(
+                "Set current margins for "
+                + current_coin.symbol
+                + "\n $"
+                + str(usd_value)
+                + (" goes up." if y_pred[0] > usd_value else " goes down.")
+                + " Expected value $"
+                + str(y_pred[0])
+                + "\n Buy: "
+                + str(buy)
+                + "%, Sell: "
+                + str(sell)
+                + "%\n last10vals: "
+                + str(history)
+            )
 
         self.db.set_current_margins(current_coin, usd_value, buy, sell)
