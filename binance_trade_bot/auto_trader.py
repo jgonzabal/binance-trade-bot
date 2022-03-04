@@ -437,7 +437,7 @@ class AutoTrader:
                 + "%, Sell: "
                 + str(sell)
                 + "%\n last10vals: "
-                + str(history[:5] + history[-5:])
+                + str(history)
             )
 
         self.db.set_current_margins(current_coin, usd_value, buy, sell)
