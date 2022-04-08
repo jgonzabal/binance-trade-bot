@@ -300,8 +300,8 @@ class AutoTrader:
                     margin_coin, update_buy_mul, update_sell_mul = self.db.get_current_margins()
                     self.logger.debug("Updating sell mul " + str(update_sell_mul))
                     self.logger.debug("Updating buy mul " + str(update_buy_mul))
-                    self.logger.debug("Margin/Current " + str(margin_coin) + '/' + str(current_coin))
-                    if str(margin_coin) != str(current_coin) or update_buy_mul is None or update_sell_mul is None:
+                    self.logger.debug("Margin/Current " + margin_coin + '/' + current_coin.symbol)
+                    if margin_coin != current_coin.symbol or update_buy_mul is None or update_sell_mul is None:
                         update_buy_mul = self.config.UPDATE_BUY_MUL
                         update_sell_mul = self.config.UPDATE_SELL_MUL
 
