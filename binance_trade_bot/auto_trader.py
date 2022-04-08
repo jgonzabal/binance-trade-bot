@@ -315,7 +315,7 @@ class AutoTrader:
                             self.config.BRIDGE_SYMBOL,
                             usd_value,
                             float(order["origQty"]),
-                            mul=self.config.UPDATE_SELL_MUL,
+                            mul=usd_value * (1 - update_sell_mul / 100),
                         )
                     elif (
                         "stopPrice" in order
@@ -329,7 +329,7 @@ class AutoTrader:
                             current_coin.symbol,
                             self.config.BRIDGE_SYMBOL,
                             usd_value,
-                            mul=self.config.UPDATE_BUY_MUL,
+                            mul=usd_value * (1 + update_buy_mul / 100),
                         )
             else:
                 coin_balance = 0
