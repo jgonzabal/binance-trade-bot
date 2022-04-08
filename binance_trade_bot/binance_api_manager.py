@@ -407,8 +407,8 @@ class BinanceAPIManager:
                     symbol=origin_symbol + target_symbol,
                     quantity=order_quantity,
                     type=self.binance_client.ORDER_TYPE_STOP_LOSS_LIMIT,
-                    price=round(price * (1 + multiplier / 100), precision),
-                    stopPrice=round(price * (1 + multiplier / 100), precision),
+                    price=price,
+                    stopPrice=price,
                     side=self.binance_client.SIDE_BUY,
                     timeInForce="GTC",
                 )
