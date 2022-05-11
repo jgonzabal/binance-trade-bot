@@ -396,19 +396,19 @@ class AutoTrader:
         #    sell = self.config.UPDATE_SELL_MUL
         # if not increasing:
         if model.coef_[0][0] < 0:
-            buy = origbuy + movingStep
-            if buy > 4.0:
-                buy = 4.0
-            sell = origsell - movingStep
-            if sell < 1.0:
-                sell = 1.0
+            buy = 4.5
+            if buy > 4.5:
+                buy = 4.5
+            sell = 0.5
+            if sell < 0.5:
+                sell = 0.5
         else:
             buy = origbuy - movingStep
-            if buy < 1.0:
-                buy = 1.0
+            if buy < 0.5:
+                buy = 0.5
             sell = origsell + movingStep
-            if sell > 4.0:
-                sell = 4.0
+            if sell > 4.5:
+                sell = 4.5
 
         if buy != origbuy or sell != origsell:
             self.logger.info(
